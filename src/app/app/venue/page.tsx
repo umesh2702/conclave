@@ -2,389 +2,340 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { 
-  MapPin, 
-  Layers, 
-  Radio, 
-  Calendar, 
-  Wifi, 
-  Coffee, 
-  ShieldCheck, 
-  LifeBuoy, 
-  Sparkles, 
-  Clock, 
-  Navigation,
-  ArrowRight,
-  ExternalLink,
-  Users
-} from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 import { Navbar } from '@/components/common/Navbar';
 import { Footer } from '@/components/common/Footer';
 import { StorageService } from '@/services/storage';
 import { VenueZone, Session } from '@/types';
+import { 
+  Compass, 
+  MapPin, 
+  Layers, 
+  Wifi, 
+  Coffee, 
+  ShieldCheck, 
+  LifeBuoy, 
+  Clock, 
+  Navigation,
+  ArrowRight,
+  Radio,
+  ExternalLink,
+  ChevronRight,
+  CheckCircle2,
+  Sparkles,
+  Info
+} from 'lucide-react';
 
-export default function VenueGuidePage() {
+export default function VenueCompanionPage() {
+  const searchParams = useSearchParams();
+  const highlightedParam = searchParams.get('highlight');
+
   const [zones, setZones] = useState<VenueZone[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [selectedLevel, setSelectedLevel] = useState<string>('All');
-  const [selectedZoneId, setSelectedZoneId] = useState<string | null>('zone-1');
+  const [selectedZoneId, setSelectedZoneId] = useState<string>('zone-1');
 
-  const loadData = () => {
+  useEffect(() => {
     const allZones = StorageService.getVenueZones();
     const allSessions = StorageService.getSessions();
     setZones(allZones);
     setSessions(allSessions);
-  };
 
-  useEffect(() => {
-    loadData();
-    const handleUpdate = () => loadData();
-    window.addEventListener('ccc-storage-updated', handleUpdate);
-    return () => window.removeEventListener('ccc-storage-updated', handleUpdate);
-  }, []);
+    if (highlightedParam && allZones.length > 0) {
+      const match = allZones.find(
+        (z) => z.name.toLowerCase().includes(highlightedParam.toLowerCase()) ||
+               (z.stageName && z.stageName.toLowerCase().includes(highlightedParam.toLowerCase()))
+      );
+      if (match) {
+        setSelectedZoneId(match.id);
+        setSelectedLevel(match.level);
+      }
+    }
+  }, [highlightedParam]);
 
   const levels = ['All', 'Level 1', 'Level 2', 'Sky Level'];
 
   const filteredZones = selectedLevel === 'All' 
     ? zones 
-    : zones.filter(z => z.level === selectedLevel);
+    : zones.filter((z) => z.level === selectedLevel);
 
-  const selectedZone = zones.find(z => z.id === selectedZoneId) || zones[0];
+  const selectedZone = zones.find((z) => z.id === selectedZoneId) || zones[0];
 
-  // Find currently live session
-  const liveSession = sessions.find(s => s.liveStatus === 'live');
-
-  // Find sessions for selected zone
+  // Sessions taking place in this selected zone
   const zoneSessions = selectedZone?.stageName 
-    ? sessions.filter(s => s.stage === selectedZone.stageName || s.location.includes(selectedZone.name))
+    ? sessions.filter((s) => s.stage === selectedZone.stageName || s.location.includes(selectedZone.name))
     : [];
 
+  const liveSessionInZone = zoneSessions.find((s) => s.liveStatus === 'live');
+
+  // Step-by-step walking instructions depending on level/zone
+  const getDirections = (zone: VenueZone) => {
+    switch (zone.code) {
+      case 'STAGE-A':
+        return [
+          'From the main Level 1 concourse, walk past the Fast-Track Registration Desk.',
+          'Take the central illuminated hallway toward Grand Ballroom A.',
+          'Doors open directly into the main auditorium tier.',
+        ];
+      case 'REG-EAST':
+        return [
+          'Located immediately inside the ground floor arrival concourse.',
+          'Present your digital QR pass at any optical scanner pillar.',
+          'Collect your printed physical lanyard badge at counter 1-4.',
+        ];
+      case 'DINING-L1':
+        return [
+          'Located in the South Wing of Level 1, opposite Plenary Stage A.',
+          'Open continuously for artisan coffee, refreshments, and lunch buffets.',
+        ];
+      case 'STAGE-B':
+        return [
+          'Take the central escalator or elevator bank to Level 2.',
+          'Turn left at the top of the escalators toward Hall B.',
+          'Acoustic double doors marked "Venture Stage B".',
+        ];
+      case 'PODS-L2':
+        return [
+          'Take the escalator to Level 2 and proceed to the North Wing.',
+          'Check in with the Deal Room concierge at the reception desk.',
+          'Pods A-1 through B-8 are labeled along the private carpeted suites.',
+        ];
+      case 'LOUNGE-L2':
+        return [
+          'Located on Level 2 between Venture Stage B and Deal Pods.',
+          'Private card/token access reserved for verified Investors and Speakers.',
+        ];
+      case 'TERRACE-SKY':
+        return [
+          'Take the express high-speed elevator directly to "Sky Level (Floor 5)".',
+          'Exit onto the open-air panoramic garden and cocktail lounge.',
+        ];
+      case 'OPS-L1':
+        return [
+          'Located next to the East Concourse registration desks.',
+          'Technical support, speaker green room liaison, and lost-and-found.',
+        ];
+      default:
+        return [
+          'Follow illuminated digital signage in the central lobby.',
+          'Conclave floor stewards are stationed at all escalator banks.',
+        ];
+    }
+  };
+
   return (
-    <div className="min-h-screen flex flex-col bg-[#080E18]">
+    <div className="min-h-screen flex flex-col bg-[#080D16] text-[#F5F3EF]">
       <Navbar />
 
-      <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full space-y-8">
-        {/* Header Banner */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#0C1524] via-[#0E1A2E] to-[#12223D] border border-white/[0.08] p-6 md:p-8">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-[#DFC394]/5 rounded-full blur-3xl pointer-events-none" />
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#DFC394]/10 border border-[#DFC394]/20 text-[#DFC394] text-xs font-medium uppercase tracking-wider mb-3">
-              <MapPin className="w-3.5 h-3.5" />
-              Physical Conclave Navigation Layer
+      <main className="flex-1 max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-5 sm:py-6 md:py-8 w-full space-y-5 sm:space-y-6 pb-28 md:pb-12">
+        
+        {/* Header Section */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3.5 pb-4 border-b border-[#202C3D]">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <span className="text-[10px] font-mono uppercase tracking-widest text-[#D2B47C] font-semibold">
+                Venue Companion &amp; Wayfinding
+              </span>
+              <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                Floor Directory
+              </span>
             </div>
-            <h1 className="text-2xl md:text-3xl font-serif font-bold text-[#F5F3EF] tracking-tight">
-              Venue Guide & Wayfinding
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-serif font-bold text-[#F5F3EF] tracking-tight">
+              Cyber Convention Centre &amp; Grand Ballroom
             </h1>
-            <p className="text-sm md:text-base text-[#9AA6B5] mt-1 max-w-2xl">
-              Hyderabad International Convention Centre (HICC) — Cyberabad Grand Complex. 
-              Find stages, private deal suites, networking lounges, and concierge stations.
-            </p>
           </div>
 
-          {/* Wi-Fi & Quick Info Badge */}
-          <div className="bg-[#080E18]/80 backdrop-blur-md border border-white/[0.08] p-4 rounded-xl flex flex-col gap-2 min-w-[240px]">
-            <div className="flex items-center justify-between text-xs text-[#9AA6B5]">
-              <span className="flex items-center gap-1.5 text-[#DFC394]">
-                <Wifi className="w-4 h-4" /> Delegate Wi-Fi
-              </span>
-              <span className="text-[10px] font-mono bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-500/20">WPA3 SECURE</span>
-            </div>
-            <div className="text-sm font-semibold text-[#F5F3EF] font-mono">CCC2026-HIGH-SPEED</div>
-            <div className="text-[11px] text-[#9AA6B5] flex items-center justify-between pt-1 border-t border-white/[0.06]">
-              <span>Key: <strong className="text-[#F5F3EF] font-mono">SynerzLive26</strong></span>
-              <span className="text-[#DFC394]">1 Gbps Fiber</span>
+          {/* Wi-Fi & Venue Credentials Pill */}
+          <div className="flex items-center gap-3 bg-[#101927] border border-[#202C3D] px-3.5 py-2 rounded-xl text-xs">
+            <Wifi className="w-4 h-4 text-[#D2B47C] shrink-0" />
+            <div className="min-w-0">
+              <div className="font-semibold text-[#F5F3EF] truncate">
+                Network: <span className="font-mono text-[#D2B47C]">CCC2026-HIGH-SPEED</span>
+              </div>
+              <div className="text-[10px] text-[#91A0B4] truncate">
+                Passcode: <span className="font-mono text-[#F5F3EF]">SynerzLive26</span> • 1 Gbps Fiber
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Live Indicator Bar */}
-        {liveSession && (
-          <div className="mt-6 pt-4 border-t border-white/[0.08] flex flex-wrap items-center justify-between gap-3 bg-emerald-950/20 px-4 py-2.5 rounded-xl border border-emerald-500/20">
-            <div className="flex items-center gap-2.5">
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-              </span>
-              <span className="text-xs font-semibold text-emerald-300 uppercase tracking-wider">LIVE NOW:</span>
-              <span className="text-xs text-[#F5F3EF] font-medium truncate max-w-md">{liveSession.title}</span>
+        {/* Level Switcher Strip */}
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 max-w-full">
+          <span className="text-xs font-mono text-[#91A0B4] mr-1 hidden sm:inline shrink-0">Select Floor:</span>
+          {levels.map((lvl) => (
+            <button
+              key={lvl}
+              onClick={() => setSelectedLevel(lvl)}
+              className={`min-h-[40px] px-3.5 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
+                selectedLevel === lvl
+                  ? 'bg-[#152235] text-[#D2B47C] border border-[#D2B47C]/40 shadow-sm'
+                  : 'bg-[#101927] text-[#91A0B4] hover:text-[#F5F3EF] border border-[#202C3D]'
+              }`}
+            >
+              {lvl}
+            </button>
+          ))}
+        </div>
+
+        {/* Interactive Schematic Layout & Zone Dossier Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          
+          {/* LEFT: Schematic Floor Directory Cards (7 COLS) */}
+          <div className="lg:col-span-7 space-y-3">
+            <div className="text-xs font-mono uppercase tracking-wider text-[#91A0B4] flex items-center justify-between pb-1">
+              <span>Interactive Floor Plan Zones ({filteredZones.length})</span>
+              <span>Click a zone to inspect</span>
             </div>
-            <div className="flex items-center gap-3">
-              <span className="text-xs font-medium text-[#DFC394] bg-[#DFC394]/10 px-2 py-0.5 rounded border border-[#DFC394]/20 flex items-center gap-1">
-                <Navigation className="w-3 h-3" /> {liveSession.stage || liveSession.location}
-              </span>
-              <Link 
-                href="/app"
-                className="text-xs text-[#DFC394] hover:underline flex items-center gap-1"
-              >
-                View Live Hub <ArrowRight className="w-3 h-3" />
-              </Link>
-            </div>
-          </div>
-        )}
-      </div>
 
-      {/* Level Selector Tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-        {levels.map((lvl) => (
-          <button
-            key={lvl}
-            onClick={() => setSelectedLevel(lvl)}
-            className={`px-4 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-all flex items-center gap-1.5 ${
-              selectedLevel === lvl
-                ? 'bg-[#DFC394] text-[#080E18] shadow-sm font-semibold'
-                : 'bg-[#0E1A2E]/80 text-[#9AA6B5] hover:text-[#F5F3EF] border border-white/[0.06] hover:bg-[#12223D]'
-            }`}
-          >
-            <Layers className="w-3.5 h-3.5" />
-            {lvl === 'All' ? 'All Conclave Levels' : lvl}
-          </button>
-        ))}
-      </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {filteredZones.map((zone) => {
+                const isSelected = selectedZone?.id === zone.id;
+                const hasLive = sessions.some((s) => (s.stage === zone.stageName || s.location.includes(zone.name)) && s.liveStatus === 'live');
 
-      {/* Main Grid: Interactive Zone Map + Detail Sidebar */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Column: Zones Grid Layout (7 cols) */}
-        <div className="lg:col-span-7 space-y-4">
-          <div className="flex items-center justify-between mb-1">
-            <h2 className="text-base font-serif font-semibold text-[#F5F3EF] flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-[#DFC394]" />
-              Conclave Destination Zones ({filteredZones.length})
-            </h2>
-            <span className="text-xs text-[#9AA6B5]">Tap any zone to view details & live sessions</span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {filteredZones.map((zone) => {
-              const isSelected = selectedZone?.id === zone.id;
-              const hasLive = liveSession && (
-                (zone.stageName && liveSession.stage === zone.stageName) ||
-                liveSession.location.includes(zone.name)
-              );
-
-              return (
-                <div
-                  key={zone.id}
-                  onClick={() => setSelectedZoneId(zone.id)}
-                  className={`cursor-pointer rounded-2xl p-5 transition-all text-left relative overflow-hidden border ${
-                    isSelected
-                      ? 'bg-gradient-to-br from-[#12223D] to-[#0E1A2E] border-[#DFC394] shadow-lg shadow-[#DFC394]/5 ring-1 ring-[#DFC394]/40'
-                      : 'bg-[#0E1A2E]/60 hover:bg-[#0E1A2E] border-white/[0.08] hover:border-white/[0.18]'
-                  }`}
-                >
-                  {/* Top code and level badge */}
-                  <div className="flex items-center justify-between mb-3">
-                    <span 
-                      className="text-[10px] font-mono uppercase px-2 py-0.5 rounded font-bold tracking-wider"
-                      style={{ 
-                        backgroundColor: `${zone.color || '#DFC394'}15`, 
-                        color: zone.color || '#DFC394',
-                        border: `1px solid ${zone.color || '#DFC394'}30`
-                      }}
-                    >
-                      {zone.code}
-                    </span>
-                    <span className="text-xs text-[#9AA6B5] flex items-center gap-1">
-                      <Layers className="w-3 h-3 text-[#7998B8]" /> {zone.level}
-                    </span>
-                  </div>
-
-                  {/* Title & Live indicator */}
-                  <div className="flex items-start justify-between gap-2">
-                    <h3 className={`font-serif text-base font-semibold leading-snug ${isSelected ? 'text-[#DFC394]' : 'text-[#F5F3EF]'}`}>
-                      {zone.name}
-                    </h3>
-                    {hasLive && (
-                      <span className="shrink-0 flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/30 animate-pulse">
-                        <Radio className="w-3 h-3" /> LIVE
+                return (
+                  <div
+                    key={zone.id}
+                    onClick={() => setSelectedZoneId(zone.id)}
+                    className={`p-4 rounded-xl border text-left cursor-pointer transition-all space-y-2 relative ${
+                      isSelected
+                        ? 'bg-[#152235] border-[#D2B47C] shadow-lg ring-1 ring-[#D2B47C]/40'
+                        : 'surface-interactive'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-mono text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-[#080D16] text-[#D2B47C] border border-[#202C3D]">
+                        {zone.code}
                       </span>
-                    )}
-                  </div>
-
-                  <p className="text-xs text-[#9AA6B5] mt-2 line-clamp-2 leading-relaxed">
-                    {zone.description}
-                  </p>
-
-                  {/* Bottom Stats */}
-                  <div className="mt-4 pt-3 border-t border-white/[0.06] flex items-center justify-between text-[11px] text-[#9AA6B5]">
-                    <span className="flex items-center gap-1">
-                      <Users className="w-3 h-3 text-[#7998B8]" /> {zone.capacity || 'All Delegates'}
-                    </span>
-                    <span className="text-[#DFC394] font-medium flex items-center gap-1 group">
-                      View Guide <ArrowRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Right Column: Selected Zone Deep Dive (5 cols) */}
-        <div className="lg:col-span-5">
-          {selectedZone ? (
-            <div className="sticky top-20 rounded-2xl bg-[#0E1A2E] border border-white/[0.1] p-6 space-y-6 shadow-xl">
-              {/* Zone Header */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-mono font-bold text-[#DFC394] bg-[#DFC394]/10 px-2.5 py-0.5 rounded border border-[#DFC394]/20">
-                    {selectedZone.code} • {selectedZone.level}
-                  </span>
-                  <span className="text-xs text-[#9AA6B5]">Capacity: {selectedZone.capacity || 'General Access'}</span>
-                </div>
-                <h3 className="text-xl font-serif font-bold text-[#F5F3EF]">
-                  {selectedZone.name}
-                </h3>
-                <p className="text-sm text-[#9AA6B5] mt-2 leading-relaxed">
-                  {selectedZone.description}
-                </p>
-              </div>
-
-              {/* Facilities Checklist */}
-              <div>
-                <h4 className="text-xs font-semibold text-[#F5F3EF] uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5 text-[#DFC394]" /> Key Facilities & Amenities
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {selectedZone.facilities.map((fac, idx) => (
-                    <div 
-                      key={idx}
-                      className="flex items-center gap-2 p-2 rounded-lg bg-[#080E18]/60 border border-white/[0.04] text-xs text-[#9AA6B5]"
-                    >
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#DFC394]" />
-                      <span>{fac}</span>
+                      <span className="text-[10px] font-mono text-[#91A0B4]">
+                        {zone.level}
+                      </span>
                     </div>
-                  ))}
-                </div>
-              </div>
 
-              {/* Scheduled Sessions in this Zone */}
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-xs font-semibold text-[#F5F3EF] uppercase tracking-wider flex items-center gap-1.5">
-                    <Calendar className="w-3.5 h-3.5 text-[#DFC394]" /> Sessions at this Stage ({zoneSessions.length})
-                  </h4>
-                  {selectedZone.stageName && (
-                    <Link
-                      href={`/app/agenda`}
-                      className="text-[11px] text-[#DFC394] hover:underline flex items-center gap-1"
-                    >
-                      Full Programme <ArrowRight className="w-2.5 h-2.5" />
-                    </Link>
-                  )}
+                    <div>
+                      <h3 className="text-sm font-serif font-bold text-[#F5F3EF] leading-snug">
+                        {zone.name}
+                      </h3>
+                      <p className="text-[11px] text-[#91A0B4] line-clamp-2 mt-1 font-light">
+                        {zone.description}
+                      </p>
+                    </div>
+
+                    <div className="pt-2 border-t border-[#202C3D] flex items-center justify-between text-[11px]">
+                      <span className="text-[#91A0B4]">{zone.capacity || 'Open Floor'}</span>
+                      {hasLive && (
+                        <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-400">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          Live Now
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* RIGHT: Detailed Zone Dossier & Navigation Guide (5 COLS) */}
+          <div className="lg:col-span-5 space-y-4">
+            {selectedZone ? (
+              <div className="surface-card-elevated p-6 space-y-5 sticky top-20 shadow-2xl">
+                
+                {/* Zone Header */}
+                <div className="space-y-1.5 pb-4 border-b border-[#202C3D]">
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-xs font-bold text-[#D2B47C] bg-[#101927] px-2.5 py-0.5 rounded border border-[#202C3D]">
+                      {selectedZone.code} • {selectedZone.level}
+                    </span>
+                    <span className="text-xs text-[#91A0B4] font-mono">
+                      Capacity: {selectedZone.capacity || 'Open Concourse'}
+                    </span>
+                  </div>
+
+                  <h2 className="text-xl font-serif font-bold text-[#F5F3EF]">
+                    {selectedZone.name}
+                  </h2>
+                  <p className="text-xs text-[#91A0B4] leading-relaxed font-light">
+                    {selectedZone.description}
+                  </p>
                 </div>
 
-                {zoneSessions.length > 0 ? (
-                  <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
-                    {zoneSessions.map((ses) => (
-                      <div 
-                        key={ses.id}
-                        className={`p-3 rounded-xl border text-left ${
-                          ses.liveStatus === 'live'
-                            ? 'bg-emerald-950/30 border-emerald-500/40'
-                            : ses.liveStatus === 'completed'
-                            ? 'bg-[#080E18]/40 border-white/[0.04] opacity-60'
-                            : 'bg-[#080E18]/80 border-white/[0.06]'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between text-[11px] mb-1">
-                          <span className="text-[#DFC394] font-medium flex items-center gap-1">
-                            <Clock className="w-3 h-3" /> Day {ses.day} • {ses.startTime} – {ses.endTime}
-                          </span>
-                          {ses.liveStatus === 'live' && (
-                            <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/20 px-1.5 py-0.2 rounded animate-pulse">
-                              LIVE NOW
-                            </span>
-                          )}
-                          {ses.liveStatus === 'completed' && (
-                            <span className="text-[10px] text-[#9AA6B5]">Completed</span>
-                          )}
-                        </div>
-                        <p className="text-xs font-semibold text-[#F5F3EF] line-clamp-1">{ses.title}</p>
+                {/* Facilities List */}
+                <div className="space-y-2">
+                  <div className="text-[11px] font-mono uppercase tracking-wider text-[#D2B47C] font-semibold">
+                    Key Facilities &amp; Equipment
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                    {selectedZone.facilities.map((fac, idx) => (
+                      <div key={idx} className="flex items-center gap-2 p-2 rounded-lg bg-[#101927] border border-[#202C3D] text-[11px] text-[#F5F3EF]">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-[#D2B47C] shrink-0" />
+                        <span className="truncate">{fac}</span>
                       </div>
                     ))}
                   </div>
-                ) : (
-                  <div className="p-4 rounded-xl bg-[#080E18]/40 border border-white/[0.04] text-center text-xs text-[#9AA6B5]">
-                    No formal stage keynotes scheduled here. This area is dedicated to continuous networking, hospitality, and operations.
-                  </div>
-                )}
-              </div>
+                </div>
 
-              {/* Direction helper */}
-              <div className="p-4 rounded-xl bg-gradient-to-br from-[#DFC394]/10 to-transparent border border-[#DFC394]/20 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-[#DFC394]/20 flex items-center justify-center text-[#DFC394]">
-                    <Navigation className="w-4 h-4" />
+                {/* Step-by-Step Walking Directions */}
+                <div className="space-y-2 pt-2 border-t border-[#202C3D]">
+                  <div className="text-[11px] font-mono uppercase tracking-wider text-[#D2B47C] font-semibold flex items-center gap-1.5">
+                    <Navigation className="w-3.5 h-3.5" />
+                    <span>How to Reach This Location</span>
                   </div>
-                  <div>
-                    <div className="text-xs font-semibold text-[#F5F3EF]">Need Escort or Assistance?</div>
-                    <div className="text-[11px] text-[#9AA6B5]">Visit Operations Desk on Level 1 (Zone OPS-L1)</div>
+                  <div className="space-y-1.5 text-xs text-[#91A0B4]">
+                    {getDirections(selectedZone).map((step, i) => (
+                      <div key={i} className="flex items-start gap-2 leading-relaxed">
+                        <span className="font-mono text-[10px] text-[#D2B47C] font-bold shrink-0 pt-0.5">
+                          {i + 1}.
+                        </span>
+                        <span>{step}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
-                <Link
-                  href="/app/agenda"
-                  className="px-3 py-1.5 rounded-lg bg-[#DFC394] text-[#080E18] text-xs font-semibold hover:bg-[#edd8b4] transition-colors whitespace-nowrap"
-                >
-                  Schedule
-                </Link>
+
+                {/* Associated Sessions in this Zone */}
+                {zoneSessions.length > 0 && (
+                  <div className="space-y-2 pt-3 border-t border-[#202C3D]">
+                    <div className="text-[11px] font-mono uppercase tracking-wider text-[#D2B47C] font-semibold flex items-center justify-between">
+                      <span>Sessions in this Room ({zoneSessions.length})</span>
+                      <Link href="/app/agenda" className="text-[10px] text-[#91A0B4] hover:text-[#D2B47C]">
+                        Full Schedule →
+                      </Link>
+                    </div>
+
+                    <div className="space-y-2">
+                      {zoneSessions.map((s) => (
+                        <div
+                          key={s.id}
+                          className="p-2.5 rounded-lg bg-[#101927] border border-[#202C3D] text-xs flex items-center justify-between gap-2"
+                        >
+                          <div className="truncate">
+                            <div className="font-semibold text-[#F5F3EF] truncate">{s.title}</div>
+                            <div className="text-[10px] font-mono text-[#91A0B4]">Day {s.day} • {s.startTime}</div>
+                          </div>
+                          {s.liveStatus === 'live' && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/20 text-emerald-400 shrink-0">
+                              LIVE
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
               </div>
-            </div>
-          ) : null}
+            ) : (
+              <div className="surface-card p-8 text-center text-xs text-[#91A0B4]">
+                Select a zone from the floor plan to inspect location details and navigation instructions.
+              </div>
+            )}
+          </div>
+
         </div>
-      </div>
 
-      {/* Bottom Emergency & Hospitality Services Cards */}
-      <div className="border-t border-white/[0.08] pt-8">
-        <h3 className="text-base font-serif font-semibold text-[#F5F3EF] mb-4 flex items-center gap-2">
-          <LifeBuoy className="w-4 h-4 text-[#DFC394]" />
-          Essential On-Site Delegate Services
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="p-4 rounded-xl bg-[#0E1A2E]/60 border border-white/[0.06] flex items-start gap-3">
-            <div className="p-2.5 rounded-lg bg-[#DFC394]/10 text-[#DFC394] shrink-0">
-              <Coffee className="w-4 h-4" />
-            </div>
-            <div>
-              <div className="text-xs font-semibold text-[#F5F3EF]">Barista & Catering</div>
-              <div className="text-[11px] text-[#9AA6B5] mt-0.5">Dining Pavilion (Level 1) & Sky Terrace Bar. Continuous service 8:30 AM – 6:30 PM.</div>
-            </div>
-          </div>
+      </main>
 
-          <div className="p-4 rounded-xl bg-[#0E1A2E]/60 border border-white/[0.06] flex items-start gap-3">
-            <div className="p-2.5 rounded-lg bg-[#7998B8]/10 text-[#7998B8] shrink-0">
-              <LifeBuoy className="w-4 h-4" />
-            </div>
-            <div>
-              <div className="text-xs font-semibold text-[#F5F3EF]">ULink Technical Concierge</div>
-              <div className="text-[11px] text-[#9AA6B5] mt-0.5">East Lobby Registration Concourse. Device charging, badge re-prints & app support.</div>
-            </div>
-          </div>
-
-          <div className="p-4 rounded-xl bg-[#0E1A2E]/60 border border-white/[0.06] flex items-start gap-3">
-            <div className="p-2.5 rounded-lg bg-emerald-500/10 text-emerald-400 shrink-0">
-              <ShieldCheck className="w-4 h-4" />
-            </div>
-            <div>
-              <div className="text-xs font-semibold text-[#F5F3EF]">Medical & First Aid</div>
-              <div className="text-[11px] text-[#9AA6B5] mt-0.5">Level 1 West Wing Corridor adjacent to Plenary Hall. Paramedic on standby.</div>
-            </div>
-          </div>
-
-          <div className="p-4 rounded-xl bg-[#0E1A2E]/60 border border-white/[0.06] flex items-start gap-3">
-            <div className="p-2.5 rounded-lg bg-purple-500/10 text-purple-400 shrink-0">
-              <Users className="w-4 h-4" />
-            </div>
-            <div>
-              <div className="text-xs font-semibold text-[#F5F3EF]">Deal Pod Concierge</div>
-              <div className="text-[11px] text-[#9AA6B5] mt-0.5">Level 2 Center Lobby. Hostesses assist founders and investors to allocated pods.</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </main>
-
-    <Footer />
-  </div>
+      <Footer />
+    </div>
   );
 }

@@ -17,22 +17,22 @@ import {
   TrendingUp, 
   Award, 
   Users,
-  ExternalLink,
-  Layers,
+  Radio,
   Clock,
-  Radio
+  X,
+  Sliders
 } from 'lucide-react';
 
 export function DemoBar() {
-  const { currentUser, role, demoAccounts, switchUser, resetAllData } = useAuth();
+  const { currentUser, demoAccounts, switchUser, resetAllData } = useAuth();
+  const [isOpen, setIsOpen] = useState(false);
   const [resetting, setResetting] = useState(false);
-  const [clockDropdownOpen, setClockDropdownOpen] = useState(false);
   const pathname = usePathname();
 
   const clock = Storage.getSimulationClock();
 
   const handleReset = () => {
-    if (confirm('Reset all demo data back to the original realistic seed state?')) {
+    if (confirm('Restore initial Conclave demo dataset? All sessions, bookmarks, and connections will revert to default.')) {
       setResetting(true);
       resetAllData();
       setTimeout(() => setResetting(false), 500);
@@ -41,7 +41,6 @@ export function DemoBar() {
 
   const handleSelectClockPreset = (presetKey: string) => {
     SimulationService.applyPreset(presetKey);
-    setClockDropdownOpen(false);
   };
 
   const getRoleIcon = (userRole: UserRole) => {
@@ -49,7 +48,7 @@ export function DemoBar() {
       case 'founder':
         return <TrendingUp className="w-3.5 h-3.5 text-[#7998B8]" />;
       case 'investor':
-        return <Briefcase className="w-3.5 h-3.5 text-[#C7A875]" />;
+        return <Briefcase className="w-3.5 h-3.5 text-[#D2B47C]" />;
       case 'mentor':
         return <Award className="w-3.5 h-3.5 text-emerald-400" />;
       case 'organizer':
@@ -60,111 +59,165 @@ export function DemoBar() {
   };
 
   return (
-    <aside aria-label="Demo environment control panel" className="sticky top-0 z-50 bg-[#0D1522]/95 border-b border-white/10 backdrop-blur-md transition-all text-xs">
-      <div className="max-w-7xl mx-auto px-4 py-1.5 flex flex-wrap items-center justify-between gap-2">
-        {/* Left: Mode Badge & Event Clock Simulator */}
-        <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#111B2A] border border-[#C7A875]/30 text-[#C7A875] font-semibold tracking-wider text-[10px] uppercase">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#C7A875] animate-ping" />
-            ULink Live
-          </span>
+    <>
+      {/* Floating Discreet Demo Trigger Pill */}
+      <div className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+4.5rem)] md:bottom-5 right-3 sm:right-4 z-40">
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className={`min-h-[40px] flex items-center gap-2 px-3.5 py-2 rounded-full text-xs font-semibold shadow-xl border transition-all ${
+            isOpen 
+              ? 'bg-[#152235] border-[#D2B47C] text-[#D2B47C]' 
+              : 'bg-[#101927]/90 hover:bg-[#152235] border-[#202C3D] hover:border-[#D2B47C]/40 text-[#91A0B4] hover:text-[#F5F3EF] backdrop-blur-md'
+          }`}
+          title="Open Demo Persona & Clock Simulation Controls"
+        >
+          <span className="w-2 h-2 rounded-full bg-[#D2B47C] animate-pulse" />
+          <span className="text-[11px] font-mono tracking-tight">DEMO CONTROLS</span>
+          {isOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
+        </button>
+      </div>
 
-          {/* Event Clock Simulator Widget */}
-          <div className="relative">
-            <button
-              onClick={() => setClockDropdownOpen(!clockDropdownOpen)}
-              className="flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-[#172335] hover:bg-[#1f2f47] text-[#F5F3EF] border border-emerald-500/30 text-[11px] font-mono transition-colors"
-              title="Change simulated conclave time"
-            >
-              <Radio className="w-3 h-3 text-emerald-400 animate-pulse" />
-              <span className="text-emerald-400 font-bold">LIVE:</span>
-              <span>Day {clock.currentDay} • {clock.currentTime}</span>
-              <ChevronDown className="w-3 h-3 text-[#9AA6B5]" />
-            </button>
-
-            {clockDropdownOpen && (
-              <div className="absolute top-full left-0 mt-1 w-72 bg-[#080E18] border border-white/15 rounded-xl shadow-2xl p-2 z-50 space-y-1 animate-in fade-in">
-                <div className="text-[10px] uppercase tracking-wider text-[#9AA6B5] px-2 py-1 font-semibold border-b border-white/5">
-                  Conclave Clock Simulator (Demo)
+      {/* Expanded Demo Control Center Modal / Drawer */}
+      {isOpen && (
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-end md:p-6 bg-black/50 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full md:w-[460px] bg-[#101927] border border-[#202C3D] rounded-t-2xl md:rounded-2xl shadow-2xl p-4 sm:p-5 space-y-4 sm:space-y-5 max-h-[85vh] overflow-y-auto">
+            
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-[#202C3D]">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-[#D2B47C]/15 text-[#D2B47C]">
+                  <Sliders className="w-4 h-4" />
                 </div>
+                <div>
+                  <h3 className="text-sm font-bold text-[#F5F3EF]">
+                    ULink Live Demo Companion
+                  </h3>
+                  <p className="text-[10px] text-[#91A0B4]">
+                    Simulate attendee experiences and event progression
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsOpen(false)}
+                className="w-10 h-10 min-w-[40px] min-h-[40px] flex items-center justify-center p-1 rounded-lg text-[#91A0B4] hover:text-[#F5F3EF] hover:bg-white/5 transition-colors"
+                aria-label="Close demo controls"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Persona Switcher Section */}
+            <div className="space-y-2">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-[#D2B47C] flex items-center justify-between">
+                <span>1. Switch Attendee Persona</span>
+                <span className="text-[10px] font-normal text-[#91A0B4] lowercase">
+                  active: {currentUser?.role}
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {demoAccounts.map((account) => {
+                  const isActive = currentUser?.id === account.id;
+                  return (
+                    <button
+                      key={account.id}
+                      onClick={() => switchUser(account.id)}
+                      className={`flex items-center gap-2 p-2.5 rounded-xl text-left border text-xs transition-all ${
+                        isActive
+                          ? 'bg-[#152235] border-[#D2B47C] text-[#F5F3EF] shadow-sm'
+                          : 'bg-[#080D16]/60 border-[#202C3D] text-[#91A0B4] hover:text-[#F5F3EF] hover:border-white/20'
+                      }`}
+                    >
+                      <div className="p-1.5 rounded-lg bg-[#101927] border border-white/10 shrink-0">
+                        {getRoleIcon(account.role)}
+                      </div>
+                      <div className="truncate">
+                        <div className="font-semibold truncate text-[11px]">
+                          {account.fullName}
+                        </div>
+                        <div className="text-[10px] text-[#91A0B4] capitalize">
+                          {account.category}
+                        </div>
+                      </div>
+                      {isActive && (
+                        <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#D2B47C]" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Clock Simulation Presets */}
+            <div className="space-y-2">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-[#D2B47C] flex items-center justify-between">
+                <span>2. Event Clock Timeline Presets</span>
+                <span className="text-[10px] font-mono text-emerald-400">
+                  Day {clock.currentDay} • {clock.currentTime}
+                </span>
+              </div>
+              <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
                 {SIMULATION_PRESETS.map((preset) => {
                   const isCurrent = clock.presetKey === preset.key;
                   return (
                     <button
                       key={preset.key}
                       onClick={() => handleSelectClockPreset(preset.key)}
-                      className={`w-full text-left px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-colors flex items-center justify-between ${
+                      className={`w-full min-h-[40px] text-left px-3 py-2 rounded-lg text-xs font-medium transition-all flex items-center justify-between border ${
                         isCurrent
-                          ? 'bg-[#C7A875] text-[#080E18] font-bold'
-                          : 'text-[#9AA6B5] hover:text-[#F5F3EF] hover:bg-white/5'
+                          ? 'bg-[#D2B47C] border-[#D2B47C] text-[#080D16] font-bold shadow-sm'
+                          : 'bg-[#080D16]/60 border-[#202C3D] text-[#91A0B4] hover:text-[#F5F3EF] hover:bg-white/5'
                       }`}
                     >
-                      <span className="truncate">{preset.label}</span>
-                      {isCurrent && <span className="text-[9px] uppercase font-bold ml-1">Active</span>}
+                      <span className="truncate text-[11px]">{preset.label}</span>
+                      {isCurrent ? (
+                        <span className="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded bg-[#080D16] text-[#D2B47C]">
+                          Active
+                        </span>
+                      ) : (
+                        <Radio className="w-3 h-3 opacity-40" />
+                      )}
                     </button>
                   );
                 })}
               </div>
-            )}
+            </div>
+
+            {/* Quick Actions & Reset */}
+            <div className="pt-3 border-t border-[#202C3D] flex items-center justify-between gap-3">
+              {pathname.startsWith('/admin') ? (
+                <Link
+                  href="/app"
+                  onClick={() => setIsOpen(false)}
+                  className="flex items-center min-h-[40px] gap-1.5 text-xs text-[#D2B47C] hover:underline font-semibold"
+                >
+                  <Radio className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Go to Attendee Live Hub</span>
+                </Link>
+              ) : (
+                <Link
+                  href="/admin"
+                  onClick={() => setIsOpen(false)}
+                  className="flex items-center min-h-[40px] gap-1.5 text-xs text-amber-300 hover:underline font-semibold"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Organizer Control Centre</span>
+                </Link>
+              )}
+
+              <button
+                onClick={handleReset}
+                disabled={resetting}
+                className="flex items-center justify-center min-h-[40px] gap-1.5 px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-xs text-[#91A0B4] hover:text-[#F5F3EF] border border-[#202C3D] transition-colors"
+                title="Restore default mock data"
+              >
+                <RotateCcw className={`w-3.5 h-3.5 ${resetting ? 'animate-spin' : ''}`} />
+                <span>Reset Data</span>
+              </button>
+            </div>
+
           </div>
         </div>
-
-        {/* Center: Quick Switch Roles */}
-        <div className="flex items-center gap-1 overflow-x-auto py-0.5 no-scrollbar">
-          {demoAccounts.map((account) => {
-            const isActive = currentUser?.id === account.id;
-            return (
-              <button
-                key={account.id}
-                onClick={() => switchUser(account.id)}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded text-[11px] font-medium transition-all ${
-                  isActive
-                    ? 'bg-[#C7A875] text-[#080E18] shadow-sm font-semibold'
-                    : 'bg-[#172335]/70 text-[#9AA6B5] hover:text-[#F5F3EF] hover:bg-[#172335]'
-                }`}
-                title={`Switch to ${account.fullName} (${account.category})`}
-              >
-                {getRoleIcon(account.role)}
-                <span>{account.fullName.split(' ')[0]}</span>
-                <span className="opacity-75 text-[9px] uppercase hidden md:inline">
-                  {account.role === 'organizer' ? 'Admin' : account.role}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Right: Quick Links & Reset */}
-        <div className="flex items-center gap-2">
-          {pathname.startsWith('/admin') ? (
-            <Link
-              href="/app"
-              className="flex items-center gap-1 px-2 py-0.5 rounded bg-[#172335] hover:bg-[#111B2A] text-[#7998B8] hover:text-[#F5F3EF] border border-white/10"
-            >
-              <Radio className="w-3 h-3 text-emerald-400" />
-              <span>Live Event Hub</span>
-            </Link>
-          ) : (
-            <Link
-              href="/admin"
-              className="flex items-center gap-1 px-2 py-0.5 rounded bg-[#172335] hover:bg-[#111B2A] text-amber-300 hover:text-amber-200 border border-amber-500/20"
-            >
-              <ShieldCheck className="w-3 h-3" />
-              <span>Organizer Control</span>
-            </Link>
-          )}
-
-          <button
-            onClick={handleReset}
-            disabled={resetting}
-            className="flex items-center gap-1 px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 text-[#9AA6B5] hover:text-[#F5F3EF] transition-colors"
-            title="Restore initial seed dataset"
-          >
-            <RotateCcw className={`w-3 h-3 ${resetting ? 'animate-spin' : ''}`} />
-            <span className="hidden lg:inline">Reset</span>
-          </button>
-        </div>
-      </div>
-    </aside>
+      )}
+    </>
   );
 }

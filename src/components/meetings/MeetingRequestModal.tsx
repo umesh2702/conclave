@@ -46,38 +46,40 @@ export function MeetingRequestModal({
         if (onSuccess) onSuccess();
         onClose();
       }, 1200);
-    } catch (err: any) {
-      setError(err.message || 'Failed to schedule meeting request');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to schedule meeting request';
+      setError(msg);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-      <div className="w-full max-w-lg bg-[#0D1522] border border-white/10 rounded-2xl shadow-2xl p-6 relative overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm animate-in fade-in">
+      <div className="w-full max-w-lg surface-card-elevated border border-[#202C3D] p-5 sm:p-6 relative overflow-hidden shadow-2xl max-h-[90vh] sm:max-h-[85vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-white/10 mb-5">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-[#C7A875]/15 border border-[#C7A875]/30 flex items-center justify-center text-[#DFC394]">
+        <div className="flex items-center justify-between pb-4 border-b border-white/10 mb-4 pr-10">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 rounded-lg bg-[#C7A875]/15 border border-[#C7A875]/30 flex items-center justify-center text-[#DFC394] shrink-0">
               <Calendar className="w-5 h-5" />
             </div>
-            <div>
-              <h3 className="text-base font-bold text-[#F5F3EF]">
+            <div className="min-w-0">
+              <h3 className="text-base font-bold text-[#F5F3EF] truncate">
                 Request 1:1 Deal Room Meeting
               </h3>
-              <p className="text-xs text-[#9AA6B5]">
+              <p className="text-xs text-[#9AA6B5] truncate">
                 With {recipient.fullName} ({recipient.organization})
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1 rounded-lg text-[#9AA6B5] hover:text-[#F5F3EF] hover:bg-white/5 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
         </div>
+        <button
+          onClick={onClose}
+          className="absolute top-3 right-3 sm:top-4 sm:right-4 w-10 h-10 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg text-[#9AA6B5] hover:text-[#F5F3EF] hover:bg-white/5 transition-colors"
+          aria-label="Close modal"
+        >
+          <X className="w-5 h-5" />
+        </button>
 
         {success ? (
           <div className="py-8 flex flex-col items-center text-center space-y-2">
@@ -110,20 +112,20 @@ export function MeetingRequestModal({
                       key={s.id}
                       type="button"
                       onClick={() => setSelectedSlotId(s.id)}
-                      className={`p-3 rounded-xl border text-left flex items-center justify-between text-xs transition-all ${
+                      className={`p-3 min-h-[40px] rounded-xl border text-left flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs transition-all ${
                         isSelected
                           ? 'bg-[#172335] border-[#C7A875] text-[#F5F3EF]'
                           : 'bg-[#111B2A] border-white/5 text-[#9AA6B5] hover:border-white/20'
                       }`}
                     >
                       <div className="flex items-center gap-2">
-                        <Clock className={`w-4 h-4 ${isSelected ? 'text-[#DFC394]' : 'text-[#7998B8]'}`} />
+                        <Clock className={`w-4 h-4 shrink-0 ${isSelected ? 'text-[#DFC394]' : 'text-[#7998B8]'}`} />
                         <span className="font-medium">
                           Day {s.day} — {s.timeSlot}
                         </span>
                       </div>
                       <div className="flex items-center gap-1 text-[11px] text-[#9AA6B5]">
-                        <MapPin className="w-3 h-3 text-[#C7A875]" />
+                        <MapPin className="w-3 h-3 text-[#C7A875] shrink-0" />
                         <span>{s.location}</span>
                       </div>
                     </button>
@@ -141,7 +143,7 @@ export function MeetingRequestModal({
                 onChange={(e) => setPurpose(e.target.value)}
                 required
                 rows={3}
-                className="w-full rounded-xl bg-[#111B2A] border border-white/10 px-3 py-2 text-xs text-[#F5F3EF] placeholder-[#9AA6B5]/50 focus:border-[#C7A875] focus:outline-none"
+                className="w-full min-h-[80px] rounded-xl bg-[#111B2A] border border-white/10 px-3 py-2 text-xs text-[#F5F3EF] placeholder-[#9AA6B5]/50 focus:border-[#C7A875] focus:outline-none"
                 placeholder="Briefly state your discussion points or investment thesis..."
               />
             </div>
@@ -150,14 +152,14 @@ export function MeetingRequestModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 rounded-xl text-xs font-medium text-[#9AA6B5] hover:text-[#F5F3EF] bg-white/5 hover:bg-white/10"
+                className="min-h-[40px] px-4 py-2 rounded-xl text-xs font-medium text-[#9AA6B5] hover:text-[#F5F3EF] bg-white/5 hover:bg-white/10 transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={loading}
-                className="px-5 py-2 rounded-xl text-xs font-semibold champagne-btn shadow-md"
+                className="min-h-[40px] px-5 py-2 rounded-xl text-xs font-semibold champagne-btn shadow-md transition-colors"
               >
                 {loading ? 'Submitting...' : 'Send Meeting Request'}
               </button>

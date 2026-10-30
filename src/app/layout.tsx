@@ -42,7 +42,7 @@ export default function RootLayout({
       className={`${manrope.variable} ${instrumentSerif.variable} ${inter.variable} dark`}
       style={{ fontFamily: 'var(--font-manrope), sans-serif' }}
     >
-      <body className="min-h-screen bg-[#080E18] text-[#F5F3EF] flex flex-col selection:bg-[#C7A875]/30 selection:text-[#FFF0D4] pb-16 md:pb-0">
+      <body className="min-h-screen bg-[#080D16] text-[#F5F3EF] flex flex-col selection:bg-[#D2B47C]/30 selection:text-[#FFF0D4] pb-[calc(env(safe-area-inset-bottom,0px)+5.5rem)] md:pb-0">
         <AuthProvider>
           <DemoBar />
           <div className="flex-1 flex flex-col">{children}</div>

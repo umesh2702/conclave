@@ -4,60 +4,45 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Navbar } from '@/components/common/Navbar';
 import { Footer } from '@/components/common/Footer';
-import { useAuth } from '@/context/AuthContext';
 import { StorageService } from '@/services/storage';
-import { AgendaService } from '@/services/agendaService';
+import { AgendaService, ActivityFeedItem } from '@/services/agendaService';
 import { AnnouncementService } from '@/services/announcementService';
-import { ConnectionService } from '@/services/connectionService';
-import { MeetingService } from '@/services/meetingService';
 import { Session, Speaker, Announcement, SimulationClock } from '@/types';
 import { 
   Radio, 
   Clock, 
   MapPin, 
-  Navigation, 
   Calendar, 
   Bookmark, 
   Bell, 
-  AlertTriangle, 
-  Megaphone, 
-  Users, 
-  QrCode, 
-  Mic, 
-  Layers, 
-  Handshake, 
   ArrowRight, 
   ChevronRight, 
-  CheckCircle2, 
-  AlertCircle, 
-  Ban, 
-  Timer, 
+  Mic, 
+  X,
   Sparkles,
-  ExternalLink,
-  ShieldCheck
+  AlertTriangle,
+  Compass,
+  CheckCircle2,
+  Share2,
+  ExternalLink
 } from 'lucide-react';
 
 export default function LiveEventHubPage() {
-  const { currentUser, refresh } = useAuth();
   const [clock, setClock] = useState<SimulationClock>(StorageService.getSimulationClock());
   const [sessions, setSessions] = useState<Session[]>([]);
   const [speakers, setSpeakers] = useState<Speaker[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [bookmarkedIds, setBookmarkedIds] = useState<string[]>([]);
-  const [selectedTimelineDay, setSelectedTimelineDay] = useState<number>(1);
+  const [activeSpeakerModal, setActiveSpeakerModal] = useState<Speaker | null>(null);
+  const [activeAnnouncementModal, setActiveAnnouncementModal] = useState<Announcement | null>(null);
+  const [readAnnouncementIds, setReadAnnouncementIds] = useState<string[]>([]);
 
   const loadData = () => {
-    const clk = StorageService.getSimulationClock();
-    const sess = StorageService.getSessions();
-    const spks = StorageService.getSpeakers();
-    const anns = AnnouncementService.getAnnouncements();
-    const bms = StorageService.getBookmarkedSessionIds();
-    setClock(clk);
-    setSessions(sess);
-    setSpeakers(spks);
-    setAnnouncements(anns);
-    setBookmarkedIds(bms);
-    setSelectedTimelineDay(clk.currentDay);
+    setClock(StorageService.getSimulationClock());
+    setSessions(StorageService.getSessions());
+    setSpeakers(StorageService.getSpeakers());
+    setAnnouncements(AnnouncementService.getAnnouncements());
+    setBookmarkedIds(StorageService.getBookmarkedSessionIds());
   };
 
   useEffect(() => {
@@ -73,252 +58,266 @@ export default function LiveEventHubPage() {
     setBookmarkedIds(StorageService.getBookmarkedSessionIds());
   };
 
-  // 1. Current Live Session
-  const liveSession = sessions.find(s => s.liveStatus === 'live');
+  const handleOpenAnnouncement = (ann: Announcement) => {
+    setActiveAnnouncementModal(ann);
+    if (!readAnnouncementIds.includes(ann.id)) {
+      setReadAnnouncementIds(prev => [...prev, ann.id]);
+    }
+  };
 
-  // Speakers for live session
-  const liveSessionSpeakers = liveSession 
-    ? speakers.filter(spk => liveSession.speakerIds.includes(spk.id))
+  // 1. Current Live Session (Deterministic)
+  const currentLiveSession = AgendaService.getCurrentlyLiveSession();
+
+  // 2. Concurrent live sessions on other stages ("Also happening now")
+  const concurrentSessions = currentLiveSession 
+    ? AgendaService.getConcurrentLiveSessions(currentLiveSession.id)
     : [];
 
-  // 2. Upcoming Sessions (for current day, chronological)
-  const currentDaySessions = sessions.filter(s => s.day === clock.currentDay);
-  const upcomingSessions = currentDaySessions
-    .filter(s => s.liveStatus === 'upcoming' || s.liveStatus === 'delayed')
-    .slice(0, 3);
+  // 3. Progress percentage of current session
+  const sessionProgress = currentLiveSession 
+    ? AgendaService.getSessionProgress(currentLiveSession, clock.currentTime)
+    : 0;
 
-  // 3. Timeline sessions for selected timeline day
-  const timelineSessions = sessions.filter(s => s.day === selectedTimelineDay);
+  // 4. Speakers for current live session
+  const currentLiveSpeakers = currentLiveSession
+    ? speakers.filter(spk => currentLiveSession.speakerIds.includes(spk.id))
+    : [];
+  const primarySpeaker = currentLiveSpeakers[0] || speakers[0];
 
-  // 4. Urgent announcements vs general announcements
-  const urgentAnnouncements = announcements.filter(a => a.priority === 'urgent' || a.priority === 'high');
-  const normalAnnouncements = announcements.filter(a => a.priority !== 'urgent' && a.priority !== 'high');
+  // 5. Next 2-3 sessions
+  const upcomingSessions = AgendaService.getUpcomingSessions(clock.currentDay, 3);
 
-  // 5. Secondary Pillar Networking data for current user
-  const userConnections = currentUser ? ConnectionService.getConnectionsForAttendee(currentUser.id) : null;
-  const userMeetings = currentUser ? MeetingService.getMeetingsForAttendee(currentUser.id) : [];
+  // 6. Real-time chronological activity feed
+  const activityFeed: ActivityFeedItem[] = AgendaService.getActivityFeed(clock);
+
+  // 7. Context-aware spotlight label
+  const spotlightLabel = (() => {
+    if (!currentLiveSession) return 'Keynote Panellist Spotlight';
+    const cat = currentLiveSession.category?.toLowerCase() || '';
+    if (cat.includes('keynote')) return 'Keynote Speaker Spotlight';
+    if (cat.includes('panel')) return 'Panel Discussion Spotlight';
+    if (cat.includes('fireside')) return 'Fireside Chat Spotlight';
+    if (cat.includes('workshop')) return 'Workshop Leader Spotlight';
+    if (cat.includes('pitch')) return 'Pitch Showcase Spotlight';
+    if (cat.includes('deal')) return 'Deal Room Host Spotlight';
+    return `${currentLiveSession.category} Spotlight`;
+  })();
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#080E18]">
+    <div className="min-h-screen flex flex-col bg-[#080D16] text-[#F5F3EF]">
       <Navbar />
 
-      <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full space-y-8">
+      <main className="flex-1 max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-5 md:py-8 w-full space-y-6 md:space-y-8 pb-28 md:pb-12">
         
         {/* ========================================================= */}
-        {/* SECTION A: EVENT STATUS HEADER                            */}
+        {/* EDITORIAL LIVE STATUS BAR                                */}
         {/* ========================================================= */}
-        <section className="rounded-2xl bg-gradient-to-r from-[#0C1524] via-[#0E1A2E] to-[#12223D] border border-white/[0.08] p-5 sm:p-7 relative overflow-hidden shadow-2xl">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-[#DFC394]/5 rounded-full blur-3xl pointer-events-none" />
-          
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
-            <div>
-              {/* Live Badge & Event Day */}
-              <div className="flex flex-wrap items-center gap-2.5 mb-2.5">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-bold tracking-wider uppercase">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-                  </span>
-                  CONCLAVE LIVE NOW
-                </span>
+        <section className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#202C3D]">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span className="live-pulse-badge">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+              Event Live
+            </span>
+            <span className="text-xs font-mono font-semibold text-[#D2B47C] bg-[#101927] px-2.5 py-0.5 rounded border border-[#202C3D]">
+              Day {clock.currentDay} of 2
+            </span>
+            <span className="text-xs font-mono text-[#91A0B4] flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5 text-[#D2B47C]" />
+              <span>Conclave Clock: <strong className="text-[#F5F3EF]">{clock.currentTime}</strong></span>
+            </span>
+          </div>
 
-                <span className="text-xs font-mono font-semibold text-[#DFC394] bg-[#DFC394]/10 px-2.5 py-0.5 rounded border border-[#DFC394]/20">
-                  DAY {clock.currentDay} OF 2
-                </span>
-
-                <span className="text-xs text-[#9AA6B5] flex items-center gap-1 bg-[#080E18]/80 px-2.5 py-0.5 rounded border border-white/[0.06] font-mono">
-                  <Clock className="w-3 h-3 text-[#DFC394]" /> Simulated Time: {clock.currentTime}
-                </span>
-              </div>
-
-              {/* Title & Brand */}
-              <h1 className="text-2xl sm:text-3xl font-serif font-extrabold text-[#F5F3EF] tracking-tight">
-                Capital Connect Conclave 2026
-              </h1>
-              <p className="text-xs sm:text-sm text-[#9AA6B5] mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
-                <span>Nov 14–15, 2026</span>
-                <span>•</span>
-                <span className="flex items-center gap-1 text-[#DFC394]">
-                  <MapPin className="w-3.5 h-3.5" /> HICC Cyberabad Grand Complex, Hyderabad
-                </span>
-                <span>•</span>
-                <span className="text-[#7998B8]">Startup Synerz &amp; ULink Live Layer</span>
-              </p>
-            </div>
-
-            {/* Quick Digital Pass Button */}
-            <div className="flex items-center gap-3 shrink-0">
-              <Link
-                href="/app/pass"
-                className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-[#080E18]/80 hover:bg-[#12223D] border border-[#DFC394]/40 text-xs font-semibold text-[#DFC394] shadow-sm transition-all group"
-              >
-                <QrCode className="w-4 h-4 text-[#DFC394] group-hover:scale-110 transition-transform" />
-                <div className="text-left">
-                  <div className="text-[10px] uppercase text-[#9AA6B5] font-mono tracking-wider">
-                    Fast-Track QR Pass
-                  </div>
-                  <span>{currentUser ? currentUser.id : 'Delegate Badge'}</span>
-                </div>
-              </Link>
-            </div>
+          <div className="flex items-center gap-2 text-xs text-[#91A0B4]">
+            <MapPin className="w-3.5 h-3.5 text-[#D2B47C]" />
+            <span>Cyber Convention Centre & Grand Ballroom</span>
           </div>
         </section>
 
         {/* ========================================================= */}
-        {/* URGENT ANNOUNCEMENT TICKER (IF ACTIVE)                    */}
-        {/* ========================================================= */}
-        {urgentAnnouncements.length > 0 && (
-          <div className="rounded-xl bg-gradient-to-r from-red-950/40 via-amber-950/30 to-red-950/20 border-l-4 border-l-amber-500 border border-amber-500/30 p-4 space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
-                <span className="text-xs font-bold text-amber-300 uppercase tracking-wider">
-                  Important Conclave Advisory ({urgentAnnouncements.length})
-                </span>
-              </div>
-              <span className="text-[10px] font-mono text-[#9AA6B5]">Live Organizer Feed</span>
-            </div>
-            {urgentAnnouncements.map(ann => (
-              <div key={ann.id} className="pt-1 text-xs text-[#F5F3EF]">
-                <strong className="text-amber-200">{ann.title}:</strong> {ann.message}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* ========================================================= */}
-        {/* SECTION B: CURRENTLY HAPPENING (DOMINANT HERO)            */}
+        {/* PRIMARY FOCUS: CURRENT LIVE SESSION                      */}
         {/* ========================================================= */}
         <section className="space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Radio className="w-5 h-5 text-emerald-400 animate-pulse" />
-              <h2 className="text-lg font-serif font-bold text-[#F5F3EF] tracking-tight">
-                Currently Happening on Stage
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <h2 className="text-xs font-mono uppercase tracking-widest text-[#D2B47C] font-semibold">
+                Happening Right Now
               </h2>
             </div>
-            <span className="text-xs text-[#DFC394] font-medium flex items-center gap-1">
-              <Clock className="w-3.5 h-3.5" /> Synchronized with Conclave Floor
-            </span>
+            {currentLiveSession && (
+              <span className="text-xs font-mono text-[#91A0B4]">
+                Ends at {currentLiveSession.endTime}
+              </span>
+            )}
           </div>
 
-          {liveSession ? (
-            <div className="rounded-2xl bg-gradient-to-br from-[#12223D] via-[#0E1A2E] to-[#0A1424] border-2 border-emerald-500/40 shadow-2xl p-6 sm:p-8 relative overflow-hidden">
-              {/* Pulsing ambient glow */}
-              <div className="absolute top-0 right-0 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+          {currentLiveSession ? (
+            <div className="surface-card-elevated p-4 sm:p-7 md:p-8 relative overflow-hidden shadow-2xl transition-all">
+              {/* Subtle Ambient Lighting */}
+              <div className="absolute top-0 right-0 w-80 h-80 bg-[#D2B47C]/5 rounded-full blur-3xl pointer-events-none" />
 
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
-                {/* Session Main Details */}
-                <div className="space-y-4 max-w-3xl">
-                  {/* Status, Stage, and Time Badges */}
-                  <div className="flex flex-wrap items-center gap-2.5">
-                    <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-bold border border-emerald-500/40 animate-pulse">
-                      <Radio className="w-3.5 h-3.5" /> LIVE IN PROGRESS
+              <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 items-start justify-between relative z-10">
+                
+                {/* Left: Session Editorial Core */}
+                <div className="flex-1 space-y-4 max-w-3xl w-full">
+                  {/* Stage, Floor & Category Badges */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="px-2.5 py-1 rounded-md bg-[#101927] border border-[#202C3D] text-[#D2B47C] text-xs font-medium flex items-center gap-1.5 min-w-0">
+                      <Compass className="w-3.5 h-3.5 shrink-0" />
+                      <span className="truncate">{currentLiveSession.stage || currentLiveSession.location}</span>
                     </span>
 
-                    <span className="px-3 py-1 rounded-full bg-[#DFC394]/15 text-[#DFC394] text-xs font-semibold border border-[#DFC394]/30 flex items-center gap-1">
-                      <Navigation className="w-3 h-3" /> {liveSession.stage || liveSession.location}
-                    </span>
-
-                    {liveSession.floor && (
-                      <span className="px-2.5 py-1 rounded-full bg-white/[0.06] text-[#9AA6B5] text-xs font-mono">
-                        {liveSession.floor}
+                    {currentLiveSession.floor && (
+                      <span className="px-2.5 py-1 rounded-md bg-[#101927] border border-[#202C3D] text-[#91A0B4] text-xs font-mono">
+                        {currentLiveSession.floor}
                       </span>
                     )}
 
-                    <span className="font-mono text-xs text-[#9AA6B5] bg-[#080E18]/80 px-2.5 py-1 rounded border border-white/[0.06]">
-                      {liveSession.startTime} – {liveSession.endTime}
+                    <span className="px-2 py-1 rounded-md bg-white/[0.04] text-[#91A0B4] text-xs font-medium">
+                      {currentLiveSession.category}
+                    </span>
+
+                    <span className="font-mono text-xs text-[#91A0B4] bg-[#080D16] px-2.5 py-1 rounded border border-[#202C3D] whitespace-nowrap">
+                      {currentLiveSession.startTime} – {currentLiveSession.endTime}
                     </span>
                   </div>
 
-                  {/* Title */}
-                  <h3 className="text-2xl sm:text-3xl font-serif font-bold text-[#F5F3EF] leading-tight">
-                    {liveSession.title}
-                  </h3>
+                  {/* Editorial Headline */}
+                  <h1 className="text-2xl sm:text-3xl md:text-4xl font-serif font-bold text-[#F5F3EF] leading-tight tracking-tight">
+                    {currentLiveSession.title}
+                  </h1>
 
-                  {/* Description */}
-                  <p className="text-sm text-[#9AA6B5] leading-relaxed">
-                    {liveSession.description}
+                  {/* Summary / Description */}
+                  <p className="text-sm md:text-base text-[#91A0B4] leading-relaxed max-w-2xl font-light">
+                    {currentLiveSession.description}
                   </p>
 
-                  {/* Speakers Row */}
-                  {liveSessionSpeakers.length > 0 && (
-                    <div className="pt-2">
-                      <div className="text-[11px] font-bold uppercase tracking-wider text-[#DFC394] mb-2 flex items-center gap-1.5">
-                        <Mic className="w-3.5 h-3.5" /> Speaking Right Now:
+                  {/* Session Progress Bar */}
+                  <div className="space-y-1.5 pt-1 max-w-xl">
+                    <div className="flex items-center justify-between text-[11px] font-mono text-[#91A0B4]">
+                      <span>{currentLiveSession.startTime}</span>
+                      <span className="text-[#D2B47C] font-semibold">{sessionProgress}% elapsed</span>
+                      <span>{currentLiveSession.endTime}</span>
+                    </div>
+                    <div className="w-full h-2 bg-[#101927] rounded-full overflow-hidden border border-[#202C3D]">
+                      <div 
+                        className="h-full bg-gradient-to-r from-emerald-500 to-[#D2B47C] rounded-full transition-all duration-500"
+                        style={{ width: `${sessionProgress}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Current Speaker Spotlight Card */}
+                  {primarySpeaker && (
+                    <div className="pt-3">
+                      <div className="text-[11px] font-mono uppercase tracking-wider text-[#91A0B4] mb-2 flex items-center gap-1.5">
+                        <Mic className="w-3.5 h-3.5 text-[#D2B47C]" />
+                        <span>{spotlightLabel}</span>
                       </div>
-                      <div className="flex flex-wrap items-center gap-4">
-                        {liveSessionSpeakers.map(spk => (
-                          <Link
-                            key={spk.id}
-                            href="/app/speakers"
-                            className="flex items-center gap-3 p-2 pr-4 rounded-xl bg-[#080E18]/60 hover:bg-[#080E18] border border-white/[0.06] hover:border-[#DFC394]/40 transition-colors group"
-                          >
+
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-[#101927] border border-[#202C3D]">
+                        <div className="flex items-center gap-3.5 min-w-0 w-full sm:w-auto">
+                          <div className="relative w-12 h-12 rounded-full overflow-hidden border-2 border-[#D2B47C]/40 shrink-0 bg-[#152235]">
                             <img
-                              src={spk.avatarUrl}
-                              alt={spk.name}
-                              className="w-10 h-10 rounded-full object-cover border border-[#DFC394]/40"
+                              src={primarySpeaker.imageUrl || primarySpeaker.avatarUrl}
+                              alt={primarySpeaker.name}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                (e.target as HTMLElement).style.display = 'none';
+                              }}
                             />
-                            <div>
-                              <div className="text-xs font-bold text-[#F5F3EF] group-hover:text-[#DFC394] transition-colors">
-                                {spk.name}
-                              </div>
-                              <div className="text-[10px] text-[#9AA6B5]">
-                                {spk.title} • {spk.organization}
-                              </div>
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-sm font-bold text-[#F5F3EF] truncate">
+                                {primarySpeaker.name}
+                              </h3>
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-[#D2B47C]/15 text-[#D2B47C] shrink-0">
+                                Speaker
+                              </span>
                             </div>
-                          </Link>
-                        ))}
+                            <div className="text-xs text-[#91A0B4] truncate">
+                              {primarySpeaker.designation || primarySpeaker.title} • <span className="text-[#F5F3EF]">{primarySpeaker.organization}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => setActiveSpeakerModal(primarySpeaker)}
+                          className="w-full sm:w-auto min-h-[40px] px-3.5 py-2 rounded-lg text-xs font-semibold text-[#D2B47C] hover:bg-[#152235] border border-[#D2B47C]/30 transition-colors flex items-center justify-center shrink-0"
+                        >
+                          View Bio
+                        </button>
                       </div>
+                    </div>
+                  )}
+
+                  {/* Multiple Active Stages Pill */}
+                  {concurrentSessions.length > 0 && (
+                    <div className="pt-2 flex flex-wrap items-center gap-2 text-xs">
+                      <span className="text-[#91A0B4] font-mono text-[11px]">Also happening now:</span>
+                      {concurrentSessions.map((cs) => (
+                        <Link
+                          key={cs.id}
+                          href="/app/agenda"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 min-h-[36px] sm:min-h-0 rounded-md bg-[#101927] border border-[#202C3D] hover:border-[#D2B47C]/40 text-[#F5F3EF] transition-colors"
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                          <span className="font-medium truncate max-w-[180px]">{cs.title}</span>
+                          <span className="text-[10px] text-[#91A0B4]">({cs.stage})</span>
+                        </Link>
+                      ))}
                     </div>
                   )}
                 </div>
 
-                {/* Right Action Column */}
-                <div className="flex flex-col sm:flex-row lg:flex-col gap-3 shrink-0 justify-center">
+                {/* Right: Focused Primary Action Column */}
+                <div className="flex flex-col sm:flex-row lg:flex-col gap-2.5 sm:gap-3 w-full lg:w-56 shrink-0 justify-center">
                   <Link
-                    href="/app/venue"
-                    className="px-5 py-3 rounded-xl bg-[#DFC394] hover:bg-[#ebd3ab] text-[#080E18] text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-[#DFC394]/10 transition-colors"
+                    href={`/app/venue?highlight=${encodeURIComponent(currentLiveSession.stage || currentLiveSession.location)}`}
+                    className="w-full min-h-[42px] px-4 py-2.5 rounded-xl champagne-btn text-xs font-bold flex items-center justify-center gap-2 shadow-lg transition-transform hover:scale-[1.02]"
                   >
-                    <Navigation className="w-4 h-4" />
-                    <span>Take Me to Stage (Venue)</span>
+                    <Compass className="w-4 h-4" />
+                    <span>Navigate to Stage</span>
                   </Link>
 
                   <button
-                    onClick={(e) => handleToggleBookmark(liveSession.id, e)}
-                    className={`px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 border transition-colors ${
-                      bookmarkedIds.includes(liveSession.id)
-                        ? 'bg-[#DFC394]/20 border-[#DFC394] text-[#DFC394]'
-                        : 'bg-white/[0.06] hover:bg-white/[0.1] border-white/[0.1] text-[#9AA6B5] hover:text-[#F5F3EF]'
+                    onClick={(e) => handleToggleBookmark(currentLiveSession.id, e)}
+                    className={`w-full min-h-[42px] px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 border transition-colors ${
+                      bookmarkedIds.includes(currentLiveSession.id)
+                        ? 'bg-[#D2B47C]/15 border-[#D2B47C] text-[#D2B47C]'
+                        : 'bg-[#101927] hover:bg-[#152235] border-[#202C3D] text-[#91A0B4] hover:text-[#F5F3EF]'
                     }`}
                   >
-                    <Bookmark className={`w-3.5 h-3.5 ${bookmarkedIds.includes(liveSession.id) ? 'fill-[#DFC394]' : ''}`} />
-                    <span>{bookmarkedIds.includes(liveSession.id) ? 'Bookmarked in My Schedule' : 'Bookmark Session'}</span>
+                    <Bookmark className={`w-3.5 h-3.5 ${bookmarkedIds.includes(currentLiveSession.id) ? 'fill-[#D2B47C]' : ''}`} />
+                    <span>{bookmarkedIds.includes(currentLiveSession.id) ? 'Saved to Schedule' : 'Save Session'}</span>
                   </button>
 
                   <Link
                     href="/app/agenda"
-                    className="text-xs text-[#9AA6B5] hover:text-[#DFC394] text-center flex items-center justify-center gap-1 pt-1"
+                    className="min-h-[40px] text-xs text-[#91A0B4] hover:text-[#D2B47C] text-center flex items-center justify-center gap-1 py-1.5 transition-colors"
                   >
-                    <span>View full session dossier</span>
+                    <span>Full Programme Details</span>
                     <ArrowRight className="w-3 h-3" />
                   </Link>
                 </div>
+
               </div>
             </div>
           ) : (
-            <div className="rounded-2xl bg-[#0E1A2E]/70 border border-white/[0.08] p-8 text-center space-y-3">
-              <Timer className="w-10 h-10 text-[#DFC394] mx-auto opacity-70" />
+            <div className="surface-card p-8 text-center space-y-3">
+              <Clock className="w-10 h-10 text-[#D2B47C] mx-auto opacity-70" />
               <h3 className="text-xl font-serif font-bold text-[#F5F3EF]">
                 Conclave Floor Intermission
               </h3>
-              <p className="text-xs text-[#9AA6B5] max-w-md mx-auto">
-                No session is currently presenting on the main plenary stage. Delegates are invited to explore the Dining Pavilion on Level 1 or bilateral Deal Pods on Level 2.
+              <p className="text-xs text-[#91A0B4] max-w-md mx-auto">
+                No active plenary address is currently taking place. Delegates are invited to explore the bilateral Deal Pods on Level 2 or Barista Pavilion on Level 1.
               </p>
               <div className="pt-2">
                 <Link
                   href="/app/agenda"
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#DFC394]/15 border border-[#DFC394]/30 text-xs text-[#DFC394] font-semibold hover:bg-[#DFC394]/25"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#D2B47C]/15 border border-[#D2B47C]/30 text-xs text-[#D2B47C] font-semibold hover:bg-[#D2B47C]/25"
                 >
                   <Calendar className="w-3.5 h-3.5" /> Check Next Scheduled Track
                 </Link>
@@ -328,49 +327,49 @@ export default function LiveEventHubPage() {
         </section>
 
         {/* ========================================================= */}
-        {/* SECTION C & E: 2-COLUMN SPLIT (UP NEXT + ANNOUNCEMENTS)   */}
+        {/* TWO-COLUMN EDITORIAL SPLIT: WHAT'S NEXT & ANNOUNCEMENTS    */}
         {/* ========================================================= */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
           
-          {/* UP NEXT (7 COLS) */}
-          <div className="lg:col-span-7 space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-[#DFC394]" />
-                <h2 className="text-base font-serif font-bold text-[#F5F3EF]">
-                  Up Next on Programme
+          {/* SECTION 3.3: WHAT'S NEXT (7 COLS) */}
+          <div className="lg:col-span-7 space-y-3">
+            <div className="flex items-center justify-between pb-1 gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <Clock className="w-4 h-4 text-[#D2B47C] shrink-0" />
+                <h2 className="text-base font-serif font-bold text-[#F5F3EF] truncate">
+                  What&apos;s Next on Programme
                 </h2>
               </div>
               <Link
                 href="/app/agenda"
-                className="text-xs text-[#DFC394] hover:underline flex items-center gap-1"
+                className="text-xs text-[#D2B47C] hover:underline flex items-center gap-1 font-medium shrink-0 ml-2"
               >
-                <span>Full Schedule</span>
+                <span>Full Programme</span>
                 <ChevronRight className="w-3 h-3" />
               </Link>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               {upcomingSessions.length > 0 ? (
-                upcomingSessions.map((ses, idx) => {
+                upcomingSessions.map((ses) => {
                   const sesSpeakers = speakers.filter(s => ses.speakerIds.includes(s.id));
                   const isBookmarked = bookmarkedIds.includes(ses.id);
 
                   return (
                     <div
                       key={ses.id}
-                      className="rounded-xl bg-[#0E1A2E]/80 border border-white/[0.08] hover:border-[#DFC394]/40 p-4 transition-all space-y-3 group"
+                      className="surface-interactive p-4 transition-all space-y-2.5 group"
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs font-bold text-[#DFC394] bg-[#DFC394]/10 px-2 py-0.5 rounded border border-[#DFC394]/20">
+                        <div className="flex items-center gap-2 flex-wrap min-w-0 flex-1">
+                          <span className="font-mono text-xs font-bold text-[#D2B47C] bg-[#152235] px-2 py-0.5 rounded border border-[#202C3D] whitespace-nowrap">
                             {ses.startTime}
                           </span>
-                          <span className="text-[10px] uppercase font-semibold text-[#9AA6B5] bg-white/[0.04] px-2 py-0.5 rounded">
+                          <span className="text-[10px] uppercase font-semibold text-[#91A0B4] bg-white/[0.04] px-2 py-0.5 rounded whitespace-nowrap">
                             {ses.category}
                           </span>
                           {ses.liveStatus === 'delayed' && (
-                            <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                            <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 whitespace-nowrap">
                               Delayed by 15m
                             </span>
                           )}
@@ -378,37 +377,36 @@ export default function LiveEventHubPage() {
 
                         <button
                           onClick={(e) => handleToggleBookmark(ses.id, e)}
-                          className={`p-1.5 rounded-lg border text-xs transition-colors ${
+                          className={`w-10 h-10 min-w-[40px] min-h-[40px] rounded-lg border text-xs transition-colors flex items-center justify-center shrink-0 ${
                             isBookmarked 
-                              ? 'bg-[#DFC394]/20 border-[#DFC394] text-[#DFC394]' 
-                              : 'bg-white/[0.04] border-white/[0.08] text-[#9AA6B5] hover:text-[#F5F3EF]'
+                              ? 'bg-[#D2B47C]/20 border-[#D2B47C] text-[#D2B47C]' 
+                              : 'bg-[#101927] border-[#202C3D] text-[#91A0B4] hover:text-[#F5F3EF]'
                           }`}
-                          title="Bookmark to My Schedule"
+                          title={isBookmarked ? 'Saved in My Schedule' : 'Save to My Schedule'}
+                          aria-label={isBookmarked ? 'Saved in My Schedule' : 'Save to My Schedule'}
                         >
-                          <Bookmark className={`w-3.5 h-3.5 ${isBookmarked ? 'fill-[#DFC394]' : ''}`} />
+                          <Bookmark className={`w-4 h-4 ${isBookmarked ? 'fill-[#D2B47C]' : ''}`} />
                         </button>
                       </div>
 
                       <div>
-                        <h4 className="text-sm sm:text-base font-serif font-bold text-[#F5F3EF] group-hover:text-[#DFC394] transition-colors">
+                        <h4 className="text-sm font-serif font-bold text-[#F5F3EF] group-hover:text-[#D2B47C] transition-colors leading-snug">
                           {ses.title}
                         </h4>
-                        <p className="text-xs text-[#9AA6B5] line-clamp-2 mt-1 leading-relaxed">
+                        <p className="text-xs text-[#91A0B4] line-clamp-2 mt-1 leading-relaxed font-light">
                           {ses.description}
                         </p>
                       </div>
 
-                      <div className="pt-2 border-t border-white/[0.04] flex items-center justify-between text-xs">
-                        <span className="text-[#9AA6B5] flex items-center gap-1">
-                          <MapPin className="w-3.5 h-3.5 text-[#7998B8]" />
-                          {ses.stage || ses.location}
+                      <div className="pt-2 border-t border-[#202C3D] flex flex-wrap items-center justify-between gap-2 text-xs">
+                        <span className="text-[#91A0B4] flex items-center gap-1.5 text-[11px] min-w-0">
+                          <MapPin className="w-3.5 h-3.5 text-[#D2B47C] shrink-0" />
+                          <span className="truncate">{ses.stage || ses.location}</span>
                         </span>
 
                         {sesSpeakers.length > 0 && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-[11px] text-[#9AA6B5] truncate max-w-[180px]">
-                              {sesSpeakers.map(s => s.name).join(', ')}
-                            </span>
+                          <div className="text-[11px] text-[#F5F3EF] font-medium truncate max-w-[200px]">
+                            {sesSpeakers.map(s => s.name).join(', ')}
                           </div>
                         )}
                       </div>
@@ -416,386 +414,231 @@ export default function LiveEventHubPage() {
                   );
                 })
               ) : (
-                <div className="p-6 rounded-xl bg-[#0E1A2E]/40 border border-white/[0.04] text-center text-xs text-[#9AA6B5]">
-                  No further sessions scheduled for today. Explore Day 2 programme or evening networking receptions.
+                <div className="surface-card p-6 text-center text-xs text-[#91A0B4]">
+                  No upcoming sessions remaining for today. Explore Day 2 programme or evening networking receptions.
                 </div>
               )}
             </div>
           </div>
 
-          {/* DEDICATED LIVE ANNOUNCEMENTS FEED (5 COLS) */}
-          <div className="lg:col-span-5 space-y-4">
-            <div className="flex items-center justify-between">
+          {/* SECTION 3.4: LIVE ANNOUNCEMENTS (5 COLS) */}
+          <div className="lg:col-span-5 space-y-3">
+            <div className="flex items-center justify-between pb-1">
               <div className="flex items-center gap-2">
-                <Megaphone className="w-4 h-4 text-[#DFC394]" />
+                <Bell className="w-4 h-4 text-[#D2B47C] shrink-0" />
                 <h2 className="text-base font-serif font-bold text-[#F5F3EF]">
-                  Conclave Announcements
+                  Live Announcements
                 </h2>
               </div>
-              <span className="text-[11px] text-[#9AA6B5] font-mono">Live Broadcast</span>
+              <span className="text-[10px] font-mono text-[#91A0B4] uppercase tracking-wider shrink-0">
+                Conclave Broadcast
+              </span>
             </div>
 
-            <div className="space-y-3">
-              {announcements.slice(0, 4).map((ann) => (
-                <div
-                  key={ann.id}
-                  className={`p-4 rounded-xl border text-xs space-y-1.5 ${
-                    ann.priority === 'urgent'
-                      ? 'bg-red-950/30 border-red-500/40'
-                      : ann.priority === 'high'
-                      ? 'bg-amber-950/25 border-amber-500/30'
-                      : 'bg-[#0E1A2E]/70 border-white/[0.06]'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-[#F5F3EF] flex items-center gap-1.5">
-                      {ann.priority === 'urgent' && <AlertTriangle className="w-3.5 h-3.5 text-red-400" />}
-                      {ann.title}
-                    </span>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white/[0.06] text-[#DFC394]">
-                      {ann.category}
-                    </span>
+            <div className="space-y-2.5">
+              {announcements.slice(0, 3).map((ann) => {
+                const isUnread = !readAnnouncementIds.includes(ann.id);
+                return (
+                  <div
+                    key={ann.id}
+                    onClick={() => handleOpenAnnouncement(ann)}
+                    className={`w-full p-3.5 sm:p-4 rounded-xl border text-xs space-y-2 cursor-pointer transition-all hover:border-[#D2B47C]/40 ${
+                      ann.priority === 'urgent'
+                        ? 'bg-red-950/20 border-red-500/40'
+                        : ann.priority === 'high'
+                        ? 'bg-amber-950/20 border-amber-500/40'
+                        : 'bg-[#101927] border-[#202C3D]'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-1.5 font-bold text-[#F5F3EF] min-w-0 flex-1">
+                        {isUnread && (
+                          <span className="w-2 h-2 rounded-full bg-[#D2B47C] shrink-0" />
+                        )}
+                        {ann.priority === 'urgent' && (
+                          <AlertTriangle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                        )}
+                        <span className="truncate">{ann.title}</span>
+                      </div>
+                      <span className="text-[9px] font-mono uppercase px-2 py-0.5 rounded bg-white/[0.06] text-[#D2B47C] shrink-0">
+                        {ann.category}
+                      </span>
+                    </div>
+
+                    <p className="text-[11px] text-[#91A0B4] line-clamp-2 leading-relaxed break-words">
+                      {ann.message}
+                    </p>
+
+                    <div className="pt-1.5 border-t border-white/5 text-[10px] text-[#91A0B4]/70 flex items-center justify-between gap-2">
+                      <span className="truncate max-w-[160px] sm:max-w-none">{ann.author}</span>
+                      <span className="text-[#D2B47C] font-semibold hover:underline shrink-0 flex items-center gap-1">
+                        <span>Read full update</span>
+                        <ArrowRight className="w-2.5 h-2.5" />
+                      </span>
+                    </div>
                   </div>
-                  <p className="text-[#9AA6B5] leading-relaxed">
-                    {ann.message}
-                  </p>
-                  <div className="pt-1 text-[10px] text-[#9AA6B5]/70 flex items-center justify-between">
-                    <span>By {ann.author}</span>
-                    <span>{ann.publishedAt}</span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
+
         </div>
 
         {/* ========================================================= */}
-        {/* SECTION D: LIVE PROGRAMME TIMELINE                        */}
+        {/* SECTION 3.5: SUBTLE REAL-TIME EVENT ACTIVITY FEED         */}
         {/* ========================================================= */}
-        <section className="rounded-2xl bg-[#0E1A2E]/50 border border-white/[0.08] p-6 space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/[0.08]">
-            <div>
-              <h2 className="text-lg font-serif font-bold text-[#F5F3EF] flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-[#DFC394]" />
-                Day {selectedTimelineDay} Conclave Programme Timeline
-              </h2>
-              <p className="text-xs text-[#9AA6B5] mt-0.5">
-                Real-time chronological tracker for stages, keynotes, and syndicate deal rooms
-              </p>
+        <section className="surface-card p-4 sm:p-5 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="w-2 h-2 rounded-full bg-[#D2B47C] shrink-0" />
+              <h3 className="text-xs font-mono uppercase tracking-widest text-[#91A0B4] font-semibold truncate">
+                Event Activity Feed
+              </h3>
             </div>
-
-            {/* Day Switcher */}
-            <div className="flex items-center gap-2 bg-[#080E18] p-1 rounded-xl border border-white/[0.06] self-start sm:self-auto">
-              <button
-                onClick={() => setSelectedTimelineDay(1)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                  selectedTimelineDay === 1
-                    ? 'bg-[#DFC394] text-[#080E18]'
-                    : 'text-[#9AA6B5] hover:text-[#F5F3EF]'
-                }`}
-              >
-                Day 1 (Nov 14)
-              </button>
-              <button
-                onClick={() => setSelectedTimelineDay(2)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                  selectedTimelineDay === 2
-                    ? 'bg-[#DFC394] text-[#080E18]'
-                    : 'text-[#9AA6B5] hover:text-[#F5F3EF]'
-                }`}
-              >
-                Day 2 (Nov 15)
-              </button>
-            </div>
+            <span className="text-[10px] font-mono text-[#91A0B4] shrink-0">
+              Synchronized Live
+            </span>
           </div>
 
-          {/* Timeline List */}
-          <div className="relative pl-6 sm:pl-8 space-y-6 before:content-[''] before:absolute before:left-3 sm:before:left-4 before:top-2 before:bottom-2 before:w-0.5 before:bg-white/[0.08]">
-            {timelineSessions.map((session) => {
-              const isLive = session.liveStatus === 'live';
-              const isCompleted = session.liveStatus === 'completed';
-              const isDelayed = session.liveStatus === 'delayed';
-              const isCancelled = session.liveStatus === 'cancelled';
-              const sesSpeakers = speakers.filter(s => session.speakerIds.includes(s.id));
-              const isBookmarked = bookmarkedIds.includes(session.id);
-
-              return (
-                <div key={session.id} className="relative group">
-                  {/* Timeline Bullet Indicator */}
-                  <div className={`absolute -left-6 sm:-left-8 top-1.5 w-6 h-6 rounded-full flex items-center justify-center border-2 ${
-                    isLive 
-                      ? 'bg-emerald-500 border-emerald-300 text-white shadow-lg shadow-emerald-500/50 animate-pulse'
-                      : isCompleted 
-                      ? 'bg-[#080E18] border-white/20 text-[#9AA6B5]'
-                      : isDelayed
-                      ? 'bg-amber-500 border-amber-300 text-white'
-                      : isCancelled
-                      ? 'bg-red-500 border-red-300 text-white'
-                      : 'bg-[#080E18] border-[#DFC394] text-[#DFC394]'
-                  }`}>
-                    {isLive && <Radio className="w-3 h-3" />}
-                    {isCompleted && <CheckCircle2 className="w-3 h-3 text-emerald-400" />}
-                    {isDelayed && <Clock className="w-3 h-3" />}
-                    {isCancelled && <Ban className="w-3 h-3" />}
-                    {!isLive && !isCompleted && !isDelayed && !isCancelled && (
-                      <span className="w-2 h-2 rounded-full bg-[#DFC394]" />
-                    )}
-                  </div>
-
-                  {/* Timeline Card */}
-                  <div className={`rounded-xl p-4 sm:p-5 border transition-all ${
-                    isLive 
-                      ? 'bg-gradient-to-r from-emerald-950/30 to-[#0E1A2E] border-emerald-500/50 shadow-lg'
-                      : isCompleted 
-                      ? 'bg-[#080E18]/40 border-white/[0.04] opacity-65'
-                      : 'bg-[#080E18]/80 border-white/[0.06] hover:border-white/[0.15]'
-                  }`}>
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-mono text-xs font-bold text-[#DFC394]">
-                          {session.startTime} – {session.endTime}
-                        </span>
-
-                        <span className="text-[10px] font-semibold text-[#9AA6B5] bg-white/[0.06] px-2 py-0.5 rounded">
-                          {session.category}
-                        </span>
-
-                        {isLive && (
-                          <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded border border-emerald-500/30 flex items-center gap-1 animate-pulse">
-                            <Radio className="w-3 h-3" /> LIVE NOW
-                          </span>
-                        )}
-                        {isCompleted && (
-                          <span className="text-[10px] text-[#9AA6B5] bg-white/[0.04] px-1.5 py-0.2 rounded">
-                            Concluded
-                          </span>
-                        )}
-                        {isDelayed && (
-                          <span className="text-[10px] font-bold text-amber-400 bg-amber-500/20 px-2 py-0.5 rounded border border-amber-500/30">
-                            Delayed
-                          </span>
-                        )}
-                        {isCancelled && (
-                          <span className="text-[10px] font-bold text-red-400 bg-red-500/20 px-2 py-0.5 rounded border border-red-500/30">
-                            Cancelled
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-2 self-end sm:self-auto">
-                        <button
-                          onClick={(e) => handleToggleBookmark(session.id, e)}
-                          className={`p-1.5 rounded-lg border text-xs transition-colors ${
-                            isBookmarked 
-                              ? 'bg-[#DFC394]/20 border-[#DFC394] text-[#DFC394]' 
-                              : 'bg-white/[0.04] border-white/[0.08] text-[#9AA6B5] hover:text-[#F5F3EF]'
-                          }`}
-                          title="Bookmark to My Schedule"
-                        >
-                          <Bookmark className={`w-3.5 h-3.5 ${isBookmarked ? 'fill-[#DFC394]' : ''}`} />
-                        </button>
-                      </div>
-                    </div>
-
-                    <h4 className={`text-base font-serif font-bold ${isCancelled ? 'line-through text-[#9AA6B5]' : 'text-[#F5F3EF]'}`}>
-                      {session.title}
-                    </h4>
-
-                    <p className="text-xs text-[#9AA6B5] mt-1 line-clamp-2 leading-relaxed">
-                      {session.description}
-                    </p>
-
-                    <div className="mt-3 pt-3 border-t border-white/[0.04] flex flex-wrap items-center justify-between gap-2 text-xs">
-                      <span className="text-[#9AA6B5] flex items-center gap-1">
-                        <MapPin className="w-3.5 h-3.5 text-[#7998B8]" />
-                        {session.stage || session.location}
-                        {session.floor && ` • ${session.floor}`}
-                      </span>
-
-                      {sesSpeakers.length > 0 && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-[#DFC394] text-[11px] font-medium">
-                            {sesSpeakers.map(s => s.name).join(', ')}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+          <div className="divide-y divide-[#202C3D]">
+            {activityFeed.map((item) => (
+              <div key={item.id} className="py-2.5 first:pt-0 last:pb-0 flex items-start gap-3 text-xs">
+                <span className="w-16 min-w-[4rem] font-mono text-[11px] text-[#D2B47C] shrink-0 pt-0.5 font-semibold text-left">
+                  {item.time}
+                </span>
+                <span className="text-[#F5F3EF] leading-relaxed flex-1 min-w-0 break-words">
+                  {item.text}
+                </span>
+              </div>
+            ))}
           </div>
         </section>
-
-        {/* ========================================================= */}
-        {/* SECTION F: EVENT QUICK ACCESS GRID                        */}
-        {/* ========================================================= */}
-        <section className="space-y-4">
-          <h2 className="text-base font-serif font-bold text-[#F5F3EF] flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-[#DFC394]" />
-            Conclave Quick Navigation & Services
-          </h2>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            <Link
-              href="/app/agenda"
-              className="p-4 rounded-xl bg-[#0E1A2E]/70 hover:bg-[#0E1A2E] border border-white/[0.06] hover:border-[#DFC394]/40 flex flex-col items-center text-center transition-all group"
-            >
-              <div className="p-3 rounded-xl bg-[#DFC394]/10 text-[#DFC394] group-hover:scale-110 transition-transform mb-2">
-                <Calendar className="w-5 h-5" />
-              </div>
-              <div className="text-xs font-bold text-[#F5F3EF]">Full Agenda</div>
-              <div className="text-[10px] text-[#9AA6B5] mt-0.5">Stages & Tracks</div>
-            </Link>
-
-            <Link
-              href="/app/speakers"
-              className="p-4 rounded-xl bg-[#0E1A2E]/70 hover:bg-[#0E1A2E] border border-white/[0.06] hover:border-[#DFC394]/40 flex flex-col items-center text-center transition-all group"
-            >
-              <div className="p-3 rounded-xl bg-[#7998B8]/10 text-[#7998B8] group-hover:scale-110 transition-transform mb-2">
-                <Mic className="w-5 h-5" />
-              </div>
-              <div className="text-xs font-bold text-[#F5F3EF]">Speakers</div>
-              <div className="text-[10px] text-[#9AA6B5] mt-0.5">Dossier & Bio</div>
-            </Link>
-
-            <Link
-              href="/app/venue"
-              className="p-4 rounded-xl bg-[#0E1A2E]/70 hover:bg-[#0E1A2E] border border-white/[0.06] hover:border-[#DFC394]/40 flex flex-col items-center text-center transition-all group"
-            >
-              <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-400 group-hover:scale-110 transition-transform mb-2">
-                <Navigation className="w-5 h-5" />
-              </div>
-              <div className="text-xs font-bold text-[#F5F3EF]">Venue Guide</div>
-              <div className="text-[10px] text-[#9AA6B5] mt-0.5">HICC Floor Map</div>
-            </Link>
-
-            <Link
-              href="/app/people"
-              className="p-4 rounded-xl bg-[#0E1A2E]/70 hover:bg-[#0E1A2E] border border-white/[0.06] hover:border-[#DFC394]/40 flex flex-col items-center text-center transition-all group"
-            >
-              <div className="p-3 rounded-xl bg-purple-500/10 text-purple-400 group-hover:scale-110 transition-transform mb-2">
-                <Users className="w-5 h-5" />
-              </div>
-              <div className="text-xs font-bold text-[#F5F3EF]">Directory</div>
-              <div className="text-[10px] text-[#9AA6B5] mt-0.5">Delegates & VCs</div>
-            </Link>
-
-            <Link
-              href="/app/meetings"
-              className="p-4 rounded-xl bg-[#0E1A2E]/70 hover:bg-[#0E1A2E] border border-white/[0.06] hover:border-[#DFC394]/40 flex flex-col items-center text-center transition-all group"
-            >
-              <div className="p-3 rounded-xl bg-blue-500/10 text-blue-400 group-hover:scale-110 transition-transform mb-2">
-                <Handshake className="w-5 h-5" />
-              </div>
-              <div className="text-xs font-bold text-[#F5F3EF]">Deal Pods</div>
-              <div className="text-[10px] text-[#9AA6B5] mt-0.5">1:1 Meetings</div>
-            </Link>
-
-            <Link
-              href="/app/pass"
-              className="p-4 rounded-xl bg-[#0E1A2E]/70 hover:bg-[#0E1A2E] border border-white/[0.06] hover:border-[#DFC394]/40 flex flex-col items-center text-center transition-all group"
-            >
-              <div className="p-3 rounded-xl bg-[#DFC394]/10 text-[#DFC394] group-hover:scale-110 transition-transform mb-2">
-                <QrCode className="w-5 h-5" />
-              </div>
-              <div className="text-xs font-bold text-[#F5F3EF]">Digital Pass</div>
-              <div className="text-[10px] text-[#9AA6B5] mt-0.5">Entry Credential</div>
-            </Link>
-          </div>
-        </section>
-
-        {/* ========================================================= */}
-        {/* SECONDARY PILLAR: PERSONAL NETWORKING SNAPSHOT             */}
-        {/* ========================================================= */}
-        {currentUser && (
-          <section className="pt-4 border-t border-white/[0.08] space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-serif font-bold text-[#F5F3EF]">
-                  My Bilateral Conclave Activity
-                </h3>
-                <p className="text-xs text-[#9AA6B5]">
-                  Supporting networking pillar for {currentUser.fullName} ({currentUser.category})
-                </p>
-              </div>
-              <Link
-                href="/app/connections"
-                className="text-xs text-[#DFC394] hover:underline flex items-center gap-1 font-semibold"
-              >
-                <span>Manage Network</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </Link>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {/* Deal Pod Meetings */}
-              <div className="p-4 rounded-xl bg-[#0E1A2E]/60 border border-white/[0.06] space-y-2">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-[#9AA6B5] flex items-center gap-1.5 font-medium">
-                    <Handshake className="w-3.5 h-3.5 text-[#DFC394]" /> Confirmed Deal Pods
-                  </span>
-                  <span className="font-mono text-xs font-bold text-[#DFC394]">
-                    {userMeetings.filter(m => m.status === 'confirmed').length} Scheduled
-                  </span>
-                </div>
-                <p className="text-[11px] text-[#9AA6B5]">
-                  Private 1:1 suites on Level 2 reserved for bilateral discussions.
-                </p>
-                <Link
-                  href="/app/meetings"
-                  className="text-xs text-[#DFC394] hover:underline flex items-center gap-1 pt-1 font-medium"
-                >
-                  View Meeting Pod Schedule <ArrowRight className="w-3 h-3" />
-                </Link>
-              </div>
-
-              {/* Connection Requests */}
-              <div className="p-4 rounded-xl bg-[#0E1A2E]/60 border border-white/[0.06] space-y-2">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-[#9AA6B5] flex items-center gap-1.5 font-medium">
-                    <Users className="w-3.5 h-3.5 text-[#7998B8]" /> Network Connections
-                  </span>
-                  <span className="font-mono text-xs font-bold text-[#DFC394]">
-                    {userConnections?.accepted.length || 0} Connected
-                  </span>
-                </div>
-                <p className="text-[11px] text-[#9AA6B5]">
-                  {userConnections?.received.length || 0} incoming requests pending review.
-                </p>
-                <Link
-                  href="/app/connections"
-                  className="text-xs text-[#DFC394] hover:underline flex items-center gap-1 pt-1 font-medium"
-                >
-                  Review Connection Requests <ArrowRight className="w-3 h-3" />
-                </Link>
-              </div>
-
-              {/* Secretariat Assistance */}
-              <div className="p-4 rounded-xl bg-[#0E1A2E]/60 border border-white/[0.06] space-y-2">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-[#9AA6B5] flex items-center gap-1.5 font-medium">
-                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> On-Site Operations
-                  </span>
-                  <span className="text-[10px] font-mono bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded">
-                    DESK ACTIVE
-                  </span>
-                </div>
-                <p className="text-[11px] text-[#9AA6B5]">
-                  ULink Live support &amp; delegate liaison located at Level 1 Concourse.
-                </p>
-                <Link
-                  href="/app/venue"
-                  className="text-xs text-[#DFC394] hover:underline flex items-center gap-1 pt-1 font-medium"
-                >
-                  Locate Operations Desk <ArrowRight className="w-3 h-3" />
-                </Link>
-              </div>
-            </div>
-          </section>
-        )}
 
       </main>
+
+      {/* ========================================================= */}
+      {/* SPEAKER DETAILS MODAL / DRAWER                            */}
+      {/* ========================================================= */}
+      {activeSpeakerModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+          <div className="surface-card-elevated w-full max-w-lg p-5 sm:p-6 space-y-4 sm:space-y-5 max-h-[85vh] overflow-y-auto relative shadow-2xl">
+            <button
+              onClick={() => setActiveSpeakerModal(null)}
+              className="absolute top-3 right-3 sm:top-4 sm:right-4 w-10 h-10 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg text-[#91A0B4] hover:text-[#F5F3EF] hover:bg-white/5 transition-colors"
+              aria-label="Close speaker details"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-4 pr-10">
+              <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-[#D2B47C] shrink-0 bg-[#152235]">
+                <img
+                  src={activeSpeakerModal.imageUrl || activeSpeakerModal.avatarUrl}
+                  alt={activeSpeakerModal.name}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-xl font-serif font-bold text-[#F5F3EF] truncate">
+                  {activeSpeakerModal.name}
+                </h3>
+                <div className="text-xs text-[#D2B47C] font-semibold truncate">
+                  {activeSpeakerModal.designation || activeSpeakerModal.title}
+                </div>
+                <div className="text-xs text-[#91A0B4] truncate">
+                  {activeSpeakerModal.organization}
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2 text-xs text-[#91A0B4] leading-relaxed border-t border-[#202C3D] pt-3">
+              <div className="font-mono uppercase text-[10px] text-[#D2B47C] font-semibold">
+                Biography &amp; Track Background
+              </div>
+              <p>{activeSpeakerModal.biography || activeSpeakerModal.bio}</p>
+            </div>
+
+            {activeSpeakerModal.expertise && activeSpeakerModal.expertise.length > 0 && (
+              <div className="space-y-2 text-xs border-t border-[#202C3D] pt-3">
+                <div className="font-mono uppercase text-[10px] text-[#91A0B4]">
+                  Domain Expertise
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {activeSpeakerModal.expertise.map((exp) => (
+                    <span
+                      key={exp}
+                      className="px-2.5 py-1 rounded-md bg-[#101927] border border-[#202C3D] text-[11px] text-[#F5F3EF]"
+                    >
+                      {exp}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="pt-2 border-t border-[#202C3D] flex items-center justify-between gap-3">
+              <Link
+                href="/app/people"
+                onClick={() => setActiveSpeakerModal(null)}
+                className="min-h-[40px] flex items-center text-xs text-[#D2B47C] hover:underline font-semibold"
+              >
+                View in People Directory →
+              </Link>
+              <button
+                onClick={() => setActiveSpeakerModal(null)}
+                className="min-h-[40px] px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-xs text-[#F5F3EF] transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* ANNOUNCEMENT FULL DETAIL MODAL                            */}
+      {/* ========================================================= */}
+      {activeAnnouncementModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+          <div className="surface-card-elevated w-full max-w-md p-5 sm:p-6 space-y-4 shadow-2xl relative max-h-[85vh] overflow-y-auto">
+            <button
+              onClick={() => setActiveAnnouncementModal(null)}
+              className="absolute top-3 right-3 sm:top-4 sm:right-4 w-10 h-10 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg text-[#91A0B4] hover:text-[#F5F3EF] hover:bg-white/5 transition-colors"
+              aria-label="Close announcement"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="space-y-1 pr-10">
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase bg-[#D2B47C]/15 text-[#D2B47C] font-semibold">
+                  {activeAnnouncementModal.category}
+                </span>
+                <span className="text-[10px] font-mono text-[#91A0B4]">
+                  {activeAnnouncementModal.publishedAt}
+                </span>
+              </div>
+              <h3 className="text-lg font-serif font-bold text-[#F5F3EF] pt-1">
+                {activeAnnouncementModal.title}
+              </h3>
+            </div>
+
+            <p className="text-xs text-[#91A0B4] leading-relaxed">
+              {activeAnnouncementModal.message}
+            </p>
+
+            <div className="pt-3 border-t border-[#202C3D] flex items-center justify-between text-xs text-[#91A0B4] gap-2">
+              <span className="truncate">Issued by: <strong className="text-[#F5F3EF]">{activeAnnouncementModal.author}</strong></span>
+              <button
+                onClick={() => setActiveAnnouncementModal(null)}
+                className="min-h-[40px] px-4 py-2 rounded-lg champagne-btn text-xs font-semibold shrink-0"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Footer />
     </div>

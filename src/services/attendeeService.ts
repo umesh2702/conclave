@@ -59,10 +59,11 @@ export const AttendeeService = {
     }
 
     if (filters.stage && filters.stage !== 'All') {
+      const stage = filters.stage as FounderProfile['stage'];
       attendees = attendees.filter(
         (a) =>
-          a.founderProfile?.stage === filters.stage ||
-          a.investorProfile?.preferredStages.includes(filters.stage as any)
+          a.founderProfile?.stage === stage ||
+          (stage && a.investorProfile?.preferredStages.includes(stage))
       );
     }
 

@@ -627,7 +627,7 @@ export function AttendeeTable({ onUpdate }: AttendeeTableProps) {
                       <label className="text-[10px] text-[#9AA6B5] block">Fund Category</label>
                       <select
                         value={newInvestCat}
-                        onChange={(e) => setNewInvestCat(e.target.value as any)}
+                        onChange={(e) => setNewInvestCat(e.target.value as 'Venture Capital' | 'Angel Syndicate' | 'Family Office' | 'Corporate VC' | 'Private Equity')}
                         className="w-full bg-[#172335] rounded px-2 py-1 text-xs text-[#F5F3EF]"
                       >
                         <option value="Venture Capital">Venture Capital</option>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useSyncExternalStore } from 'react';
 import { Attendee, UserRole } from '../types';
 import { AuthService } from '../services/authService';
 import { Storage } from '../services/storage';
@@ -18,10 +18,36 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+function subscribe(callback: () => void) {
+  if (typeof window === 'undefined') return () => {};
+  window.addEventListener('ccc-storage-updated', callback);
+  return () => window.removeEventListener('ccc-storage-updated', callback);
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [currentUser, setCurrentUser] = useState<Attendee | null>(null);
-  const [demoAccounts, setDemoAccounts] = useState<Attendee[]>([]);
-  const [mounted, setMounted] = useState(false);
+  const isClient = useSyncExternalStore(
+    subscribe,
+    () => true,
+    () => false
+  );
+
+  const [currentUser, setCurrentUser] = useState<Attendee | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      return AuthService.getActiveUser();
+    } catch {
+      return null;
+    }
+  });
+
+  const [demoAccounts, setDemoAccounts] = useState<Attendee[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      return AuthService.getDemoAccounts();
+    } catch {
+      return [];
+    }
+  });
 
   const loadUserState = useCallback(() => {
     try {
@@ -34,9 +60,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    setMounted(true);
-    loadUserState();
-
     const handleStorageUpdate = () => {
       loadUserState();
     };
@@ -73,8 +96,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isOrganizer: currentUser?.role === 'organizer',
   };
 
-  if (!mounted) {
-    return <div className="min-h-screen bg-[#080E18] text-[#F5F3EF]" />;
+  if (!isClient) {
+    return <div className="min-h-screen bg-[#080D16] text-[#F5F3EF]" />;
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
