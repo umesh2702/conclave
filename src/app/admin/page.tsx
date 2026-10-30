@@ -11,6 +11,7 @@ import { AgendaService } from '../../services/agendaService';
 import { AnnouncementService } from '../../services/announcementService';
 import { CheckInScanner } from '../../components/admin/CheckInScanner';
 import { AttendeeTable } from '../../components/admin/AttendeeTable';
+import { LiveControlPanel } from '../../components/admin/LiveControlPanel';
 import { Session, SessionCategory } from '../../types';
 import { 
   ShieldCheck, 
@@ -27,14 +28,15 @@ import {
   Download, 
   RotateCcw,
   Sparkles,
-  ArrowUpRight
+  ArrowUpRight,
+  Radio
 } from 'lucide-react';
 
 export default function AdminConsolePage() {
   const { currentUser, role, switchRole, refresh, resetAllData } = useAuth();
   const [activeTab, setActiveTab] = useState<
-    'checkin' | 'attendees' | 'agenda' | 'announcements' | 'networking' | 'settings'
-  >('checkin');
+    'live-control' | 'checkin' | 'attendees' | 'agenda' | 'announcements' | 'networking' | 'settings'
+  >('live-control');
 
   // Announcement state
   const [annTitle, setAnnTitle] = useState('');
@@ -210,6 +212,7 @@ export default function AdminConsolePage() {
         {/* Tab Navigation */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 border-b border-white/10 no-scrollbar">
           {[
+            { id: 'live-control', label: 'Live Event Control', icon: Radio },
             { id: 'checkin', label: 'QR Desk Scanner', icon: ScanLine },
             { id: 'attendees', label: 'Attendee Registry', icon: Users },
             { id: 'agenda', label: 'Programme & Sessions', icon: Calendar },
@@ -229,12 +232,22 @@ export default function AdminConsolePage() {
                     : 'text-[#9AA6B5] hover:text-[#F5F3EF] hover:bg-white/[0.03]'
                 }`}
               >
-                <Icon className="w-4 h-4" />
+                <Icon className={`w-4 h-4 ${tab.id === 'live-control' && active ? 'text-emerald-400' : ''}`} />
                 <span>{tab.label}</span>
+                {tab.id === 'live-control' && (
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse ml-0.5" />
+                )}
               </button>
             );
           })}
         </div>
+
+        {/* Tab 0: Live Event Control Centre */}
+        {activeTab === 'live-control' && (
+          <div className="space-y-6">
+            <LiveControlPanel onUpdate={refresh} />
+          </div>
+        )}
 
         {/* Tab 1: Check-in Scanner */}
         {activeTab === 'checkin' && (

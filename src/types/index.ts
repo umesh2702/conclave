@@ -82,12 +82,21 @@ export interface Speaker {
   id: string;
   name: string;
   designation: string;
+  title?: string;
   organization: string;
   biography: string;
+  bio?: string;
   imageUrl: string;
+  avatarUrl?: string;
   featured: boolean;
   topic?: string;
+  linkedinUrl?: string;
+  twitterUrl?: string;
+  expertise?: string[];
+  sessionIds?: string[];
 }
+
+export type SessionLiveStatus = 'upcoming' | 'live' | 'completed' | 'delayed' | 'cancelled';
 
 export interface Session {
   id: string;
@@ -98,10 +107,34 @@ export interface Session {
   title: string;
   description: string;
   location: string; // "Grand Ballroom Stage A", "Syndicate Deal Room 2"
+  stage?: string; // "Main Conclave Hall (Stage A)", "Venture Stage (Stage B)", etc.
+  floor?: string; // "Level 1", "Level 2", "Sky Level"
   category: SessionCategory;
   speakerIds: string[];
   status: 'published' | 'draft';
+  liveStatus?: SessionLiveStatus;
   capacity?: number;
+}
+
+export interface VenueZone {
+  id: string;
+  name: string;
+  code: string;
+  level: string; // "Level 1", "Level 2", "Sky Level"
+  stageName?: string;
+  description: string;
+  facilities: string[];
+  capacity?: string;
+  color?: string;
+}
+
+export interface SimulationClock {
+  currentDay: number; // 1 or 2
+  currentTime: string; // e.g. "10:30 AM"
+  presetKey: string;
+  presetLabel: string;
+  isLive: boolean;
+  statusText: string; // e.g. "CONCLAVE IN PROGRESS — DAY 1"
 }
 
 export interface Connection {

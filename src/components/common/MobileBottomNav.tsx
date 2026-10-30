@@ -3,17 +3,17 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, Calendar, Network, QrCode } from 'lucide-react';
+import { Radio, Calendar, Users, MapPin, QrCode } from 'lucide-react';
 
 export function MobileBottomNav() {
   const pathname = usePathname();
 
-  // Show bottom nav on attendee app screens or public pages
+  // Primary mobile attendee navigation: Live, Programme, People, Venue, Pass (PRD Section 10)
   const navItems = [
-    { label: 'Home', href: '/app', icon: LayoutDashboard },
-    { label: 'Discover', href: '/app/people', icon: Users },
-    { label: 'Agenda', href: '/app/agenda', icon: Calendar },
-    { label: 'Network', href: '/app/connections', icon: Network },
+    { label: 'Live', href: '/app', icon: Radio },
+    { label: 'Programme', href: '/app/agenda', icon: Calendar },
+    { label: 'People', href: '/app/people', icon: Users },
+    { label: 'Venue', href: '/app/venue', icon: MapPin },
     { label: 'Pass', href: '/app/pass', icon: QrCode },
   ];
 

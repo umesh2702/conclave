@@ -6,6 +6,8 @@ import {
   Meeting,
   Announcement,
   ConclaveEvent,
+  VenueZone,
+  SimulationClock,
 } from '../types';
 import {
   INITIAL_ATTENDEES,
@@ -15,6 +17,8 @@ import {
   INITIAL_MEETINGS,
   INITIAL_ANNOUNCEMENTS,
   INITIAL_EVENT,
+  INITIAL_VENUE_ZONES,
+  INITIAL_SIMULATION_CLOCK,
 } from './mockData';
 
 const STORAGE_KEYS = {
@@ -27,6 +31,8 @@ const STORAGE_KEYS = {
   EVENT: 'ccc_event_v1',
   ACTIVE_USER_ID: 'ccc_active_user_id_v1',
   BOOKMARKED_SESSIONS: 'ccc_bookmarks_v1',
+  SIMULATION_CLOCK: 'ccc_sim_clock_v1',
+  VENUE_ZONES: 'ccc_venue_zones_v1',
 };
 
 // SSR-safe check
@@ -148,7 +154,6 @@ export const Storage = {
   },
 
   getActiveUserId(): string {
-    // Default to Founder demo account: CCC-2026-F001
     return getFromStorage<string>(STORAGE_KEYS.ACTIVE_USER_ID, 'CCC-2026-F001');
   },
 
@@ -164,6 +169,32 @@ export const Storage = {
     setToStorage(STORAGE_KEYS.BOOKMARKED_SESSIONS, ids);
   },
 
+  getSimulationClock(): SimulationClock {
+    const clock = getFromStorage<SimulationClock | null>(STORAGE_KEYS.SIMULATION_CLOCK, null);
+    if (!clock) {
+      this.setSimulationClock(INITIAL_SIMULATION_CLOCK);
+      return INITIAL_SIMULATION_CLOCK;
+    }
+    return clock;
+  },
+
+  setSimulationClock(clock: SimulationClock): void {
+    setToStorage(STORAGE_KEYS.SIMULATION_CLOCK, clock);
+  },
+
+  getVenueZones(): VenueZone[] {
+    const zones = getFromStorage<VenueZone[]>(STORAGE_KEYS.VENUE_ZONES, []);
+    if (!zones || zones.length === 0) {
+      this.setVenueZones(INITIAL_VENUE_ZONES);
+      return INITIAL_VENUE_ZONES;
+    }
+    return zones;
+  },
+
+  setVenueZones(zones: VenueZone[]): void {
+    setToStorage(STORAGE_KEYS.VENUE_ZONES, zones);
+  },
+
   resetAll(): void {
     if (!isClient) return;
     localStorage.removeItem(STORAGE_KEYS.ATTENDEES);
@@ -175,6 +206,8 @@ export const Storage = {
     localStorage.removeItem(STORAGE_KEYS.EVENT);
     localStorage.removeItem(STORAGE_KEYS.ACTIVE_USER_ID);
     localStorage.removeItem(STORAGE_KEYS.BOOKMARKED_SESSIONS);
+    localStorage.removeItem(STORAGE_KEYS.SIMULATION_CLOCK);
+    localStorage.removeItem(STORAGE_KEYS.VENUE_ZONES);
 
     // Re-seed
     this.setAttendees(INITIAL_ATTENDEES);
@@ -186,7 +219,11 @@ export const Storage = {
     this.setEvent(INITIAL_EVENT);
     this.setActiveUserId('CCC-2026-F001');
     this.setBookmarkedSessionIds(['ses-1', 'ses-3']);
+    this.setSimulationClock(INITIAL_SIMULATION_CLOCK);
+    this.setVenueZones(INITIAL_VENUE_ZONES);
 
     window.dispatchEvent(new CustomEvent('ccc-storage-updated', { detail: { key: 'ALL_RESET' } }));
   },
 };
+
+export const StorageService = Storage;

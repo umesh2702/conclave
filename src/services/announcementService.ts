@@ -30,6 +30,16 @@ export const AnnouncementService = {
     return newAnn;
   },
 
+  updateAnnouncement(id: string, updates: Partial<Announcement>): Announcement {
+    const all = Storage.getAnnouncements();
+    const idx = all.findIndex((a) => a.id === id);
+    if (idx === -1) throw new Error('Announcement not found');
+    const updated = { ...all[idx], ...updates };
+    all[idx] = updated;
+    Storage.setAnnouncements(all);
+    return updated;
+  },
+
   deleteAnnouncement(id: string): void {
     let all = Storage.getAnnouncements();
     all = all.filter((a) => a.id !== id);

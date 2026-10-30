@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext';
 import { UserRole } from '../../types';
+import { SimulationService, SIMULATION_PRESETS } from '../../services/simulationService';
+import { Storage } from '../../services/storage';
 import { 
   Sparkles, 
   RotateCcw, 
@@ -16,14 +18,18 @@ import {
   Award, 
   Users,
   ExternalLink,
-  Layers
+  Layers,
+  Clock,
+  Radio
 } from 'lucide-react';
 
 export function DemoBar() {
   const { currentUser, role, demoAccounts, switchUser, resetAllData } = useAuth();
-  const [isOpen, setIsOpen] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [clockDropdownOpen, setClockDropdownOpen] = useState(false);
   const pathname = usePathname();
+
+  const clock = Storage.getSimulationClock();
 
   const handleReset = () => {
     if (confirm('Reset all demo data back to the original realistic seed state?')) {
@@ -31,6 +37,11 @@ export function DemoBar() {
       resetAllData();
       setTimeout(() => setResetting(false), 500);
     }
+  };
+
+  const handleSelectClockPreset = (presetKey: string) => {
+    SimulationService.applyPreset(presetKey);
+    setClockDropdownOpen(false);
   };
 
   const getRoleIcon = (userRole: UserRole) => {
@@ -51,22 +62,50 @@ export function DemoBar() {
   return (
     <aside aria-label="Demo environment control panel" className="sticky top-0 z-50 bg-[#0D1522]/95 border-b border-white/10 backdrop-blur-md transition-all text-xs">
       <div className="max-w-7xl mx-auto px-4 py-1.5 flex flex-wrap items-center justify-between gap-2">
-        {/* Left: Mode Badge & Current Demo Persona */}
-        <div className="flex items-center gap-2.5">
+        {/* Left: Mode Badge & Event Clock Simulator */}
+        <div className="flex items-center gap-2">
           <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#111B2A] border border-[#C7A875]/30 text-[#C7A875] font-semibold tracking-wider text-[10px] uppercase">
             <span className="w-1.5 h-1.5 rounded-full bg-[#C7A875] animate-ping" />
-            Demo Mode Active
+            ULink Live
           </span>
 
-          <div className="hidden sm:flex items-center gap-1.5 text-[#9AA6B5]">
-            <span>Active Persona:</span>
-            <span className="text-[#F5F3EF] font-medium flex items-center gap-1 bg-[#172335] px-2 py-0.5 rounded border border-white/5">
-              {currentUser && getRoleIcon(currentUser.role)}
-              {currentUser?.fullName || 'Loading...'}
-              <span className="text-[10px] text-[#C7A875] uppercase ml-1">
-                ({currentUser?.category})
-              </span>
-            </span>
+          {/* Event Clock Simulator Widget */}
+          <div className="relative">
+            <button
+              onClick={() => setClockDropdownOpen(!clockDropdownOpen)}
+              className="flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-[#172335] hover:bg-[#1f2f47] text-[#F5F3EF] border border-emerald-500/30 text-[11px] font-mono transition-colors"
+              title="Change simulated conclave time"
+            >
+              <Radio className="w-3 h-3 text-emerald-400 animate-pulse" />
+              <span className="text-emerald-400 font-bold">LIVE:</span>
+              <span>Day {clock.currentDay} • {clock.currentTime}</span>
+              <ChevronDown className="w-3 h-3 text-[#9AA6B5]" />
+            </button>
+
+            {clockDropdownOpen && (
+              <div className="absolute top-full left-0 mt-1 w-72 bg-[#080E18] border border-white/15 rounded-xl shadow-2xl p-2 z-50 space-y-1 animate-in fade-in">
+                <div className="text-[10px] uppercase tracking-wider text-[#9AA6B5] px-2 py-1 font-semibold border-b border-white/5">
+                  Conclave Clock Simulator (Demo)
+                </div>
+                {SIMULATION_PRESETS.map((preset) => {
+                  const isCurrent = clock.presetKey === preset.key;
+                  return (
+                    <button
+                      key={preset.key}
+                      onClick={() => handleSelectClockPreset(preset.key)}
+                      className={`w-full text-left px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-colors flex items-center justify-between ${
+                        isCurrent
+                          ? 'bg-[#C7A875] text-[#080E18] font-bold'
+                          : 'text-[#9AA6B5] hover:text-[#F5F3EF] hover:bg-white/5'
+                      }`}
+                    >
+                      <span className="truncate">{preset.label}</span>
+                      {isCurrent && <span className="text-[9px] uppercase font-bold ml-1">Active</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
 
@@ -102,8 +141,8 @@ export function DemoBar() {
               href="/app"
               className="flex items-center gap-1 px-2 py-0.5 rounded bg-[#172335] hover:bg-[#111B2A] text-[#7998B8] hover:text-[#F5F3EF] border border-white/10"
             >
-              <Layers className="w-3 h-3" />
-              <span>Attendee App</span>
+              <Radio className="w-3 h-3 text-emerald-400" />
+              <span>Live Event Hub</span>
             </Link>
           ) : (
             <Link
@@ -111,7 +150,7 @@ export function DemoBar() {
               className="flex items-center gap-1 px-2 py-0.5 rounded bg-[#172335] hover:bg-[#111B2A] text-amber-300 hover:text-amber-200 border border-amber-500/20"
             >
               <ShieldCheck className="w-3 h-3" />
-              <span>Admin Console</span>
+              <span>Organizer Control</span>
             </Link>
           )}
 
@@ -122,7 +161,7 @@ export function DemoBar() {
             title="Restore initial seed dataset"
           >
             <RotateCcw className={`w-3 h-3 ${resetting ? 'animate-spin' : ''}`} />
-            <span className="hidden lg:inline">Reset Data</span>
+            <span className="hidden lg:inline">Reset</span>
           </button>
         </div>
       </div>

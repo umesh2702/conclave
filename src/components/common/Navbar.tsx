@@ -25,16 +25,17 @@ export function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navLinks = [
-    { label: 'Overview', href: '/' },
-    { label: 'Dashboard', href: '/app' },
-    { label: 'Directory', href: '/app/people' },
-    { label: 'Agenda', href: '/app/agenda' },
+    { label: 'Live Now', href: '/app', isLive: true },
+    { label: 'Programme', href: '/app/agenda' },
+    { label: 'Speakers', href: '/app/speakers' },
+    { label: 'Venue Guide', href: '/app/venue' },
+    { label: 'People', href: '/app/people' },
     { label: 'Connections', href: '/app/connections' },
-    { label: 'Meetings', href: '/app/meetings' },
-    { label: 'Pass', href: '/app/pass' },
+    { label: 'Deal Pods', href: '/app/meetings' },
   ];
 
   const isActive = (href: string) => {
+    if (href === '/app') return pathname === '/app';
     if (href === '/') return pathname === '/';
     return pathname.startsWith(href);
   };
@@ -55,7 +56,7 @@ export function Navbar() {
                 CAPITAL CONNECT
               </span>
               <span className="text-[10px] text-[#9AA6B5] tracking-widest font-mono uppercase">
-                Startup Synerz • Conclave
+                ULink Live • Startup Synerz
               </span>
             </div>
           </Link>
@@ -68,13 +69,16 @@ export function Navbar() {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 ${
                     active
-                      ? 'bg-[#172335] text-[#DFC394] shadow-sm border border-[#C7A875]/20'
+                      ? 'bg-[#172335] text-[#DFC394] shadow-sm border border-[#C7A875]/20 font-semibold'
                       : 'text-[#9AA6B5] hover:text-[#F5F3EF] hover:bg-white/[0.04]'
                   }`}
                 >
-                  {item.label}
+                  {item.isLive && (
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  )}
+                  <span>{item.label}</span>
                 </Link>
               );
             })}
@@ -84,12 +88,12 @@ export function Navbar() {
                 href="/admin"
                 className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all flex items-center gap-1 ${
                   pathname.startsWith('/admin')
-                    ? 'bg-amber-950/40 text-amber-300 border border-amber-500/30'
+                    ? 'bg-amber-950/40 text-amber-300 border border-amber-500/30 font-semibold'
                     : 'text-amber-400/90 hover:text-amber-300 hover:bg-amber-950/20'
                 }`}
               >
                 <ShieldCheck className="w-3.5 h-3.5" />
-                <span>Console</span>
+                <span>Live Control</span>
               </Link>
             )}
           </nav>
